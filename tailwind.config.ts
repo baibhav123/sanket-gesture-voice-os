@@ -13,7 +13,19 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['Orbitron', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+      },
       colors: {
+        hud: {
+          cyan: "hsl(var(--hud-cyan))",
+          amber: "hsl(var(--hud-amber))",
+          red: "hsl(var(--hud-red))",
+          deep: "hsl(var(--hud-deep))",
+          mid: "hsl(var(--hud-mid))",
+          line: "hsl(var(--hud-line))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
