@@ -1,5 +1,5 @@
 // SanketBrain — central reactive store
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useRef, useCallback } from "react";
 
 export type LogEntry = {
   id: number;
@@ -107,9 +107,23 @@ export const brain = {
   closeAll() { state = { ...state, windows: [] }; emit(); },
 };
 
-const getState = () => state;
-
 export function useBrain<T>(selector: (s: State) => T): T {
-  const sel = () => selector(state);
-  return useSyncExternalStore(subscribe, sel, sel);
+  const selRef = useRef(selector);
+  selRef.current = selector;
+  const lastRef = useRef<{ state: State; value: T } | null>(null);
+  const getSnapshot = useCallback(() => {
+    if (lastRef.current && lastRef.current.state === state) return lastRef.current.value;
+    const value = selRef.current(state);
+    if (lastRef.current && Object.is(lastRef.current.value, value)) {
+      lastRef.current = { state, value: lastRef.current.value };
+      return lastRef.current.value;
+    }
+    lastRef.current = { state, value };
+    return value;
+  }, []);
+  const sub = useCallback((cb: () => void) => {
+    listeners.add(cb);
+    return () => { listeners.delete(cb); };
+  }, []);
+  return useSyncExternalStore(sub, getSnapshot, getSnapshot);
 }
