@@ -107,10 +107,9 @@ export const brain = {
   closeAll() { state = { ...state, windows: [] }; emit(); },
 };
 
-import { useSyncExternalStoreWithSelector } from "use-sync-external-store/with-selector";
-
 const getState = () => state;
 
 export function useBrain<T>(selector: (s: State) => T): T {
-  return useSyncExternalStoreWithSelector(subscribe, getState, getState, selector, Object.is);
+  const sel = () => selector(state);
+  return useSyncExternalStore(subscribe, sel, sel);
 }
