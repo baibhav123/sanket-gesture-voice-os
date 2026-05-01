@@ -171,24 +171,50 @@ def youtube_play(params):
 
 # ---------- WhatsApp ----------
 
-def whatsapp_send(params):
-    if not HAS_PYWHATKIT:
-        phone = params.get("phone", "").strip()
-        msg = params.get("message", "").strip()
-        if phone:
-            url = f"https://web.whatsapp.com/send?phone={quote(phone)}&text={quote(msg)}"
+def _whatsapp_native(phone: str, message: str) -> bool:
+    """Open the WhatsApp DESKTOP app via the whatsapp:// URI. Returns True if launched."""
+    uri = f"whatsapp://send?phone={quote(phone)}&text={quote(message)}"
+    try:
+        if IS_WINDOWS:
+            os.startfile(uri)  # opens registered handler (WhatsApp desktop)
+            return True
+        elif IS_MAC:
+            r = subprocess.run(["open", uri], capture_output=True)
+            return r.returncode == 0
         else:
-            url = f"https://web.whatsapp.com/"
-        webbrowser.open(url)
-        return "opened WhatsApp Web (install pywhatkit for auto-send)"
+            r = subprocess.run(["xdg-open", uri], capture_output=True)
+            return r.returncode == 0
+    except Exception:
+        return False
 
+
+def whatsapp_send(params):
     phone = params.get("phone", "").strip()
     message = params.get("message", "").strip()
-    wait = int(params.get("wait", 15))
-    if not phone or not message:
-        raise ValueError("phone and message required")
-    pywhatkit.sendwhatmsg_instantly(phone, message, wait_time=wait, tab_close=True)
-    return f"whatsapp -> {phone}"
+    if not phone:
+        raise ValueError("phone required")
+
+    # 1) Try native WhatsApp Desktop first (whatsapp:// URI scheme)
+    if _whatsapp_native(phone, message):
+        time.sleep(2.5)
+        # Press Enter to actually send the prefilled message
+        if HAS_PYAUTOGUI and message:
+            try:
+                pyautogui.press("enter")
+            except Exception:
+                pass
+        return f"whatsapp(native) -> {phone}"
+
+    # 2) Fallback to WhatsApp Web via pywhatkit (auto-send + tab close)
+    if HAS_PYWHATKIT and message:
+        wait = int(params.get("wait", 15))
+        pywhatkit.sendwhatmsg_instantly(phone, message, wait_time=wait, tab_close=True)
+        return f"whatsapp(web) -> {phone}"
+
+    # 3) Last resort: just open web with prefilled text
+    url = f"https://web.whatsapp.com/send?phone={quote(phone)}&text={quote(message)}"
+    webbrowser.open(url)
+    return "opened WhatsApp Web"
 
 
 # ---------- Mouse / Keyboard ----------
