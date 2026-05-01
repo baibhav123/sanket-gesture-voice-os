@@ -271,6 +271,19 @@ def mouse_move_rel(params):
     return f"rel {dx},{dy}"
 
 
+def mouse_move_norm(params):
+    """Absolute move using normalized 0..1 coordinates → real screen size.
+    Used for accurate hand-tracking of the laptop's real mouse cursor."""
+    _need_pyauto()
+    nx = float(params.get("nx", 0.5))
+    ny = float(params.get("ny", 0.5))
+    sw, sh = pyautogui.size()
+    x = int(max(0, min(1, nx)) * sw)
+    y = int(max(0, min(1, ny)) * sh)
+    pyautogui.moveTo(x, y, duration=0)
+    return f"abs {x},{y}"
+
+
 def scroll(params):
     _need_pyauto()
     amount = int(params.get("amount", -300))
