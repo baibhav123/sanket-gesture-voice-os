@@ -171,24 +171,50 @@ def youtube_play(params):
 
 # ---------- WhatsApp ----------
 
-def whatsapp_send(params):
-    if not HAS_PYWHATKIT:
-        phone = params.get("phone", "").strip()
-        msg = params.get("message", "").strip()
-        if phone:
-            url = f"https://web.whatsapp.com/send?phone={quote(phone)}&text={quote(msg)}"
+def _whatsapp_native(phone: str, message: str) -> bool:
+    """Open the WhatsApp DESKTOP app via the whatsapp:// URI. Returns True if launched."""
+    uri = f"whatsapp://send?phone={quote(phone)}&text={quote(message)}"
+    try:
+        if IS_WINDOWS:
+            os.startfile(uri)  # opens registered handler (WhatsApp desktop)
+            return True
+        elif IS_MAC:
+            r = subprocess.run(["open", uri], capture_output=True)
+            return r.returncode == 0
         else:
-            url = f"https://web.whatsapp.com/"
-        webbrowser.open(url)
-        return "opened WhatsApp Web (install pywhatkit for auto-send)"
+            r = subprocess.run(["xdg-open", uri], capture_output=True)
+            return r.returncode == 0
+    except Exception:
+        return False
 
+
+def whatsapp_send(params):
     phone = params.get("phone", "").strip()
     message = params.get("message", "").strip()
-    wait = int(params.get("wait", 15))
-    if not phone or not message:
-        raise ValueError("phone and message required")
-    pywhatkit.sendwhatmsg_instantly(phone, message, wait_time=wait, tab_close=True)
-    return f"whatsapp -> {phone}"
+    if not phone:
+        raise ValueError("phone required")
+
+    # 1) Try native WhatsApp Desktop first (whatsapp:// URI scheme)
+    if _whatsapp_native(phone, message):
+        time.sleep(2.5)
+        # Press Enter to actually send the prefilled message
+        if HAS_PYAUTOGUI and message:
+            try:
+                pyautogui.press("enter")
+            except Exception:
+                pass
+        return f"whatsapp(native) -> {phone}"
+
+    # 2) Fallback to WhatsApp Web via pywhatkit (auto-send + tab close)
+    if HAS_PYWHATKIT and message:
+        wait = int(params.get("wait", 15))
+        pywhatkit.sendwhatmsg_instantly(phone, message, wait_time=wait, tab_close=True)
+        return f"whatsapp(web) -> {phone}"
+
+    # 3) Last resort: just open web with prefilled text
+    url = f"https://web.whatsapp.com/send?phone={quote(phone)}&text={quote(message)}"
+    webbrowser.open(url)
+    return "opened WhatsApp Web"
 
 
 # ---------- Mouse / Keyboard ----------
@@ -243,6 +269,19 @@ def mouse_move_rel(params):
     dy = float(params.get("dy", 0))
     pyautogui.moveRel(dx, dy, duration=0)
     return f"rel {dx},{dy}"
+
+
+def mouse_move_norm(params):
+    """Absolute move using normalized 0..1 coordinates → real screen size.
+    Used for accurate hand-tracking of the laptop's real mouse cursor."""
+    _need_pyauto()
+    nx = float(params.get("nx", 0.5))
+    ny = float(params.get("ny", 0.5))
+    sw, sh = pyautogui.size()
+    x = int(max(0, min(1, nx)) * sw)
+    y = int(max(0, min(1, ny)) * sh)
+    pyautogui.moveTo(x, y, duration=0)
+    return f"abs {x},{y}"
 
 
 def scroll(params):
@@ -398,6 +437,7 @@ ACTION_REGISTRY = {
     "click": mouse_click,
     "move": mouse_move,
     "move_rel": mouse_move_rel,
+    "move_norm": mouse_move_norm,
     "scroll": scroll,
     "screenshot": screenshot,
     "volume": volume,

@@ -2,6 +2,7 @@ import { brain, AppId } from "./store";
 import { speak } from "./speech";
 import { supabase } from "@/integrations/supabase/client";
 import { desktop } from "./desktop";
+import { contacts } from "./contacts";
 
 const APP_KEYWORDS: Record<string, AppId> = {
   search: "search", google: "search",
@@ -47,15 +48,54 @@ export async function handleCommand(raw: string) {
 
   // ===== DESKTOP AGENT COMMANDS =====
 
-  // WhatsApp messaging
-  const waMatch = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+(\+?\d[\d\s-]{7,})/) ||
-                  text.match(/whatsapp\s+(\+?\d[\d\s-]{7,})\s+(?:saying\s+|message\s+)?(.+)/);
-  if (waMatch && /whatsapp/.test(text)) {
-    const [, a, b] = waMatch;
-    const phone = (b.match(/^\+?\d/) ? b : a).replace(/[\s-]/g, "");
-    const message = (b.match(/^\+?\d/) ? a : b).trim();
-    return desktopAction("whatsapp", { phone: phone.startsWith("+") ? phone : "+" + phone, message },
-      `Dispatching WhatsApp to ${phone}.`);
+  // ----- Contact book management -----
+  // "save contact mom +919876543210" / "add contact dad as 9876543210"
+  const saveContact = text.match(/(?:save|add|store)\s+contact\s+([a-z][a-z\s]*?)(?:\s+as)?\s+(\+?\d[\d\s-]{7,})/);
+  if (saveContact) {
+    const [, name, phone] = saveContact;
+    contacts.add(name.trim(), phone);
+    return respond(`Contact ${name.trim()} saved.`);
+  }
+  if (/list contacts|show contacts|my contacts/.test(text)) {
+    const list = contacts.list();
+    return respond(list.length ? `You have ${list.length} contacts: ${list.map((c) => c.name).join(", ")}.` : "No contacts saved yet.");
+  }
+
+  // ----- WhatsApp messaging (phone OR contact name) -----
+  // Patterns we accept:
+  //   "send hi to mom on whatsapp"
+  //   "whatsapp mom hi"
+  //   "send hi to +91987..."  
+  //   "whatsapp +91987... saying hi"
+  if (/whatsapp/.test(text) || /^send\s+.+\s+to\s+.+/.test(text)) {
+    let phone = ""; let message = ""; let contactName = "";
+
+    // 1) explicit phone number
+    const numMatch = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+(\+?\d[\d\s-]{7,})/) ||
+                     text.match(/whatsapp\s+(\+?\d[\d\s-]{7,})\s+(?:saying\s+|message\s+)?(.+)/);
+    if (numMatch) {
+      const [, a, b] = numMatch;
+      phone = (b.match(/^\+?\d/) ? b : a).replace(/[\s-]/g, "");
+      message = (b.match(/^\+?\d/) ? a : b).trim();
+    } else {
+      // 2) contact name patterns
+      const m1 = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+([a-z][a-z\s]*?)(?:\s+on\s+whatsapp)?$/);
+      const m2 = text.match(/whatsapp\s+([a-z][a-z\s]*?)\s+(?:saying\s+|message\s+)?(.+)/);
+      if (m1) { message = m1[1].trim(); contactName = m1[2].trim(); }
+      else if (m2) { contactName = m2[1].trim(); message = m2[2].trim(); }
+
+      if (contactName) {
+        const c = contacts.find(contactName);
+        if (!c) return respond(`No contact named ${contactName}. Say "save contact ${contactName} +91…" first.`);
+        phone = c.phone;
+      }
+    }
+
+    if (phone && message) {
+      phone = phone.startsWith("+") ? phone : "+" + phone;
+      return desktopAction("whatsapp", { phone, message },
+        `Dispatching WhatsApp to ${contactName || phone}.`);
+    }
   }
 
   // YouTube play
