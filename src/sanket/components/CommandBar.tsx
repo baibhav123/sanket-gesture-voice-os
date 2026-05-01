@@ -1,15 +1,23 @@
 import { useBrain, brain } from "@/sanket/store";
 import { handleCommand } from "@/sanket/commands";
-import { Mic, MicOff, Power, Send } from "lucide-react";
+import { Mic, MicOff, Power, Send, Video, VideoOff } from "lucide-react";
 import { useState } from "react";
 
 export function CommandBar({ voice }: { voice: { start: () => void; stop: () => void } }) {
   const active = useBrain((s) => s.active);
   const listening = useBrain((s) => s.listening);
+  const cameraEnabled = useBrain((s) => s.cameraEnabled);
+  const cameraReady = useBrain((s) => s.cameraReady);
   const lastCommand = useBrain((s) => s.lastCommand);
   const lastResponse = useBrain((s) => s.lastResponse);
   const thinking = useBrain((s) => s.thinking);
   const [text, setText] = useState("");
+
+  const toggleCamera = () => {
+    const next = !cameraEnabled;
+    brain.set({ cameraEnabled: next });
+    brain.log("system", next ? "// VISION.LINK :: REQUESTED ON" : "// VISION.LINK :: OFF");
+  };
 
   return (
     <div className="panel px-4 py-3 flex items-center gap-3">
@@ -29,9 +37,23 @@ export function CommandBar({ voice }: { voice: { start: () => void; stop: () => 
         className={`shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all disabled:opacity-30 ${
           listening ? "border-hud-amber text-hud-amber text-glow-amber animate-hud-pulse" : "border-hud-cyan/60 text-hud-cyan/80 hover:bg-hud-cyan/10"
         }`}
-        title={listening ? "Stop listening" : "Start listening"}
+        title={listening ? "Mic ON — click to mute" : "Mic OFF — click to listen"}
       >
         {listening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+      </button>
+
+      <button
+        onClick={toggleCamera}
+        className={`shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${
+          cameraEnabled && cameraReady
+            ? "border-hud-amber text-hud-amber text-glow-amber"
+            : cameraEnabled
+              ? "border-hud-cyan/60 text-hud-cyan/80 animate-hud-pulse"
+              : "border-foreground/30 text-foreground/40 hover:bg-hud-cyan/10"
+        }`}
+        title={cameraEnabled ? "Camera ON — click to turn off" : "Camera OFF — click to enable gesture"}
+      >
+        {cameraEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
       </button>
 
       <div className="flex-1 grid grid-cols-2 gap-3 text-[11px] font-mono min-w-0">
