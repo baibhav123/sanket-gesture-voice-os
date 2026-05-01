@@ -1,20 +1,19 @@
 """
 SanketX 2047 — Desktop action handlers.
-All functions are sync; called from a thread executor by agent.py.
 """
 import os
 import sys
 import time
+import shutil
 import platform
 import subprocess
 import webbrowser
 from urllib.parse import quote
 
-# Optional deps — agent works in degraded mode if any are missing.
 try:
     import pyautogui
     pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.05
+    pyautogui.PAUSE = 0.03
     HAS_PYAUTOGUI = True
 except Exception:
     HAS_PYAUTOGUI = False
@@ -25,29 +24,47 @@ try:
 except Exception:
     HAS_PYWHATKIT = False
 
+try:
+    import pyperclip
+    HAS_CLIP = True
+except Exception:
+    HAS_CLIP = False
+
 IS_WINDOWS = platform.system() == "Windows"
 IS_MAC = platform.system() == "Darwin"
 IS_LINUX = platform.system() == "Linux"
 
 
-# ---------- App launchers ----------
-
-# Windows uses `start`, mac uses `open -a`, linux tries the binary name.
-APP_ALIASES = {
-    "whatsapp": {"win": "whatsapp:", "mac": "WhatsApp", "linux": "whatsapp-desktop"},
-    "chrome":   {"win": "chrome",    "mac": "Google Chrome", "linux": "google-chrome"},
-    "firefox":  {"win": "firefox",   "mac": "Firefox",       "linux": "firefox"},
-    "edge":     {"win": "msedge",    "mac": "Microsoft Edge","linux": "microsoft-edge"},
-    "vscode":   {"win": "code",      "mac": "Visual Studio Code", "linux": "code"},
-    "notepad":  {"win": "notepad",   "mac": "TextEdit",      "linux": "gedit"},
-    "calculator":{"win": "calc",     "mac": "Calculator",    "linux": "gnome-calculator"},
-    "explorer": {"win": "explorer",  "mac": "Finder",        "linux": "nautilus"},
-    "terminal": {"win": "wt",        "mac": "Terminal",      "linux": "gnome-terminal"},
-    "spotify":  {"win": "spotify",   "mac": "Spotify",       "linux": "spotify"},
-    "youtube":  {"url": "https://youtube.com"},
-    "gmail":    {"url": "https://mail.google.com"},
-    "github":   {"url": "https://github.com"},
-    "chatgpt":  {"url": "https://chat.openai.com"},
+# ---------- App registry ----------
+# Each entry: native binary candidates per OS + fallback URL
+APP_REGISTRY = {
+    "whatsapp":  {"win": ["whatsapp"], "mac": ["WhatsApp"], "linux": ["whatsapp-desktop"], "url": "https://web.whatsapp.com"},
+    "youtube":   {"win": [], "mac": [], "linux": [], "url": "https://youtube.com"},
+    "facebook":  {"win": [], "mac": [], "linux": [], "url": "https://facebook.com"},
+    "instagram": {"win": [], "mac": [], "linux": [], "url": "https://instagram.com"},
+    "twitter":   {"win": [], "mac": [], "linux": [], "url": "https://twitter.com"},
+    "x":         {"win": [], "mac": [], "linux": [], "url": "https://x.com"},
+    "linkedin":  {"win": [], "mac": [], "linux": [], "url": "https://linkedin.com"},
+    "gmail":     {"win": [], "mac": [], "linux": [], "url": "https://mail.google.com"},
+    "github":    {"win": ["github"], "mac": ["GitHub Desktop"], "linux": [], "url": "https://github.com"},
+    "chatgpt":   {"win": [], "mac": [], "linux": [], "url": "https://chat.openai.com"},
+    "chrome":    {"win": ["chrome"], "mac": ["Google Chrome"], "linux": ["google-chrome", "chromium"], "url": "https://google.com"},
+    "firefox":   {"win": ["firefox"], "mac": ["Firefox"], "linux": ["firefox"], "url": "https://mozilla.org"},
+    "edge":      {"win": ["msedge"], "mac": ["Microsoft Edge"], "linux": ["microsoft-edge"], "url": "https://bing.com"},
+    "vscode":    {"win": ["code"], "mac": ["Visual Studio Code"], "linux": ["code"], "url": "https://vscode.dev"},
+    "code":      {"win": ["code"], "mac": ["Visual Studio Code"], "linux": ["code"], "url": "https://vscode.dev"},
+    "antigravity": {"win": ["antigravity"], "mac": ["Antigravity"], "linux": ["antigravity"], "url": "https://antigravity.google.com"},
+    "notepad":   {"win": ["notepad"], "mac": ["TextEdit"], "linux": ["gedit"]},
+    "calculator":{"win": ["calc"], "mac": ["Calculator"], "linux": ["gnome-calculator"]},
+    "calc":      {"win": ["calc"], "mac": ["Calculator"], "linux": ["gnome-calculator"]},
+    "explorer":  {"win": ["explorer"], "mac": ["Finder"], "linux": ["nautilus"]},
+    "finder":    {"win": ["explorer"], "mac": ["Finder"], "linux": ["nautilus"]},
+    "terminal":  {"win": ["wt", "cmd"], "mac": ["Terminal"], "linux": ["gnome-terminal", "konsole", "xterm"]},
+    "spotify":   {"win": ["spotify"], "mac": ["Spotify"], "linux": ["spotify"], "url": "https://open.spotify.com"},
+    "discord":   {"win": ["discord"], "mac": ["Discord"], "linux": ["discord"], "url": "https://discord.com/app"},
+    "slack":     {"win": ["slack"], "mac": ["Slack"], "linux": ["slack"], "url": "https://app.slack.com"},
+    "telegram":  {"win": ["telegram"], "mac": ["Telegram"], "linux": ["telegram-desktop"], "url": "https://web.telegram.org"},
+    "zoom":      {"win": ["zoom"], "mac": ["zoom.us"], "linux": ["zoom"], "url": "https://zoom.us"},
 }
 
 
@@ -57,26 +74,60 @@ def _platform_key():
     return "linux"
 
 
+def _try_launch_native(name):
+    """Returns True if a native app was successfully launched."""
+    entry = APP_REGISTRY.get(name, {})
+    candidates = entry.get(_platform_key(), [])
+    for cand in candidates:
+        try:
+            if IS_WINDOWS:
+                # `start` returns 0 even if not found; check via `where`
+                where = subprocess.run(f'where {cand}', shell=True, capture_output=True, text=True)
+                if where.returncode == 0 or cand in ("explorer", "calc", "notepad", "wt", "cmd"):
+                    subprocess.Popen(f'start "" {cand}', shell=True)
+                    return True
+            elif IS_MAC:
+                # `open -a` returns non-zero if app not found
+                r = subprocess.run(["open", "-a", cand], capture_output=True)
+                if r.returncode == 0:
+                    return True
+            else:
+                if shutil.which(cand):
+                    subprocess.Popen([cand])
+                    return True
+        except Exception:
+            continue
+    return False
+
+
 def open_app(params):
+    """Smart launch: try native app first; fall back to website if available."""
     name = (params.get("name") or "").strip().lower()
     if not name:
         raise ValueError("app name required")
 
-    alias = APP_ALIASES.get(name)
-    if alias and "url" in alias:
-        webbrowser.open(alias["url"])
-        return f"opened {name} in browser"
+    if _try_launch_native(name):
+        return f"launched {name} (native)"
 
-    target = (alias or {}).get(_platform_key(), name)
+    entry = APP_REGISTRY.get(name, {})
+    url = entry.get("url")
+    if url:
+        webbrowser.open(url)
+        return f"opened {name} in browser ({url})"
 
-    if IS_WINDOWS:
-        # `start "" target` handles protocols (whatsapp:) and binaries (chrome)
-        subprocess.Popen(f'start "" {target}', shell=True)
-    elif IS_MAC:
-        subprocess.Popen(["open", "-a", target])
-    else:
-        subprocess.Popen([target])
-    return f"launched {name}"
+    # Last resort: try as raw command
+    try:
+        if IS_WINDOWS:
+            subprocess.Popen(f'start "" {name}', shell=True)
+        elif IS_MAC:
+            subprocess.Popen(["open", "-a", name])
+        else:
+            subprocess.Popen([name])
+        return f"attempted launch: {name}"
+    except Exception:
+        # final fallback — google search
+        webbrowser.open(f"https://www.google.com/search?q={quote(name)}")
+        return f"no app found, searched google for {name}"
 
 
 def close_app(params):
@@ -121,12 +172,7 @@ def youtube_play(params):
 # ---------- WhatsApp ----------
 
 def whatsapp_send(params):
-    """
-    Send WhatsApp Web message.
-    params: { phone: '+91XXXXXXXXXX', message: 'hi', wait?: 15 }
-    """
     if not HAS_PYWHATKIT:
-        # Fallback: open WhatsApp Web with prefilled message
         phone = params.get("phone", "").strip()
         msg = params.get("message", "").strip()
         if phone:
@@ -155,7 +201,7 @@ def _need_pyauto():
 def type_text(params):
     _need_pyauto()
     text = params.get("text", "")
-    interval = float(params.get("interval", 0.02))
+    interval = float(params.get("interval", 0.015))
     pyautogui.typewrite(text, interval=interval)
     return f"typed {len(text)} chars"
 
@@ -185,9 +231,18 @@ def mouse_move(params):
     _need_pyauto()
     x = int(params.get("x", 0))
     y = int(params.get("y", 0))
-    duration = float(params.get("duration", 0.2))
+    duration = float(params.get("duration", 0.15))
     pyautogui.moveTo(x, y, duration=duration)
     return f"moved to {x},{y}"
+
+
+def mouse_move_rel(params):
+    """Relative mouse move — used by hand-gesture cursor."""
+    _need_pyauto()
+    dx = float(params.get("dx", 0))
+    dy = float(params.get("dy", 0))
+    pyautogui.moveRel(dx, dy, duration=0)
+    return f"rel {dx},{dy}"
 
 
 def scroll(params):
@@ -195,6 +250,56 @@ def scroll(params):
     amount = int(params.get("amount", -300))
     pyautogui.scroll(amount)
     return f"scrolled {amount}"
+
+
+# ---------- Clipboard / Code ----------
+
+def write_code(params):
+    """
+    Type code into the focused window (e.g. VS Code, Antigravity).
+    params: { code: '...', mode: 'type'|'paste' }
+    """
+    _need_pyauto()
+    code = params.get("code", "")
+    mode = params.get("mode", "type")
+
+    if mode == "paste" and HAS_CLIP:
+        pyperclip.copy(code)
+        time.sleep(0.2)
+        # Cmd+V on mac, Ctrl+V elsewhere
+        if IS_MAC:
+            pyautogui.hotkey("command", "v")
+        else:
+            pyautogui.hotkey("ctrl", "v")
+        return f"pasted {len(code)} chars"
+
+    # Default: real keystroke typing (works in all editors)
+    # Use clipboard paste for big payloads to avoid keyboard-layout issues
+    if HAS_CLIP and len(code) > 200:
+        pyperclip.copy(code)
+        time.sleep(0.2)
+        if IS_MAC:
+            pyautogui.hotkey("command", "v")
+        else:
+            pyautogui.hotkey("ctrl", "v")
+        return f"pasted {len(code)} chars"
+
+    pyautogui.typewrite(code, interval=0.005)
+    return f"typed {len(code)} chars"
+
+
+def clipboard_set(params):
+    if not HAS_CLIP:
+        raise RuntimeError("pyperclip not installed")
+    text = params.get("text", "")
+    pyperclip.copy(text)
+    return f"clipboard set ({len(text)} chars)"
+
+
+def clipboard_get(_params):
+    if not HAS_CLIP:
+        raise RuntimeError("pyperclip not installed")
+    return pyperclip.paste()
 
 
 # ---------- System ----------
@@ -218,7 +323,6 @@ def volume(params):
 
 
 def system_action(params):
-    """lock / sleep / shutdown / restart"""
     what = params.get("what", "").lower()
     if IS_WINDOWS:
         cmds = {
@@ -248,6 +352,33 @@ def system_action(params):
     return f"system {what}"
 
 
+def list_files(params):
+    """List files in a directory on the laptop."""
+    path = params.get("path") or os.path.expanduser("~")
+    path = os.path.expanduser(path)
+    if not os.path.isdir(path):
+        raise ValueError(f"not a directory: {path}")
+    items = []
+    for entry in sorted(os.listdir(path))[:200]:
+        full = os.path.join(path, entry)
+        items.append({"name": entry, "dir": os.path.isdir(full)})
+    return {"path": path, "items": items}
+
+
+def open_file(params):
+    """Open a file with the default OS handler."""
+    path = os.path.expanduser(params.get("path", ""))
+    if not os.path.exists(path):
+        raise ValueError(f"not found: {path}")
+    if IS_WINDOWS:
+        os.startfile(path)
+    elif IS_MAC:
+        subprocess.Popen(["open", path])
+    else:
+        subprocess.Popen(["xdg-open", path])
+    return f"opened {path}"
+
+
 def ping(_params):
     return {"pong": True, "time": time.time(), "platform": platform.system()}
 
@@ -266,10 +397,16 @@ ACTION_REGISTRY = {
     "press": press_key,
     "click": mouse_click,
     "move": mouse_move,
+    "move_rel": mouse_move_rel,
     "scroll": scroll,
     "screenshot": screenshot,
     "volume": volume,
     "system": system_action,
+    "write_code": write_code,
+    "clipboard_set": clipboard_set,
+    "clipboard_get": clipboard_get,
+    "list_files": list_files,
+    "open_file": open_file,
 }
 
 

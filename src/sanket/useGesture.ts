@@ -1,6 +1,7 @@
-// MediaPipe Hands via CDN — virtual cursor + pinch click
+// MediaPipe Hands via CDN — virtual cursor + pinch click + real-desktop mouse forwarding
 import { useEffect, useRef } from "react";
 import { brain } from "./store";
+import { desktop } from "./desktop";
 
 declare global { interface Window { Hands?: any; Camera?: any; } }
 
@@ -23,12 +24,16 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
   const handsRef = useRef<any>(null);
   const camRef = useRef<any>(null);
   const smoothRef = useRef<{ x: number; y: number } | null>(null);
-  const pinchHoldRef = useRef<{ down: boolean; lastClick: number }>({ down: false, lastClick: 0 });
+  const lastDesktopRef = useRef<{ x: number; y: number } | null>(null);
+  const lastSendRef = useRef<number>(0);
+  const pinchHoldRef = useRef<{ down: boolean; lastClick: number; desktopFired: boolean }>({ down: false, lastClick: 0, desktopFired: false });
 
   useEffect(() => {
     let cancelled = false;
+    let started = false;
 
     async function init() {
+      if (!brain.get().cameraEnabled) return;
       try {
         await ensureMediaPipe();
         if (cancelled || !window.Hands || !videoRef.current) return;
@@ -56,12 +61,43 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         });
         camRef.current = cam;
         await cam.start();
+        started = true;
         brain.set({ cameraReady: true });
         brain.log("system", "// VISION.LINK ONLINE");
       } catch (e: any) {
         brain.log("error", "// VISION.LINK FAILED: " + (e?.message || ""));
       }
     }
+
+    function stopAll() {
+      try { camRef.current?.stop?.(); } catch {}
+      try { handsRef.current?.close?.(); } catch {}
+      const v = videoRef.current;
+      if (v?.srcObject) {
+        (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+        v.srcObject = null;
+      }
+      camRef.current = null;
+      handsRef.current = null;
+      started = false;
+      brain.set({ cameraReady: false, cursor: { ...brain.get().cursor, visible: false }, fingers: 0 });
+    }
+
+    // React to cameraEnabled toggle
+    const unsub = (() => {
+      let prev = brain.get().cameraEnabled;
+      const sub = () => {
+        const cur = brain.get().cameraEnabled;
+        if (cur !== prev) {
+          prev = cur;
+          if (cur && !started) init();
+          else if (!cur && started) stopAll();
+        }
+      };
+      // poll subscribe via store internal listener
+      const id = setInterval(sub, 300);
+      return () => clearInterval(id);
+    })();
 
     function countFingers(lm: any[]) {
       // thumb tip 4, index 8, middle 12, ring 16, pinky 20
@@ -115,6 +151,29 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         pinchHoldRef.current.down = false;
       }
 
+      // Forward to real desktop mouse (relative move) when agent online
+      if (desktop.isOnline()) {
+        const prevPos = lastDesktopRef.current;
+        if (prevPos) {
+          const dx = (x - prevPos.x) * 1.4; // amplify
+          const dy = (y - prevPos.y) * 1.4;
+          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            const now = performance.now();
+            if (now - lastSendRef.current > 30) {
+              lastSendRef.current = now;
+              desktop.send("move_rel", { dx, dy }).catch(() => {});
+            }
+          }
+        }
+        lastDesktopRef.current = { x, y };
+        if (pinching && !pinchHoldRef.current.desktopFired) {
+          pinchHoldRef.current.desktopFired = true;
+          desktop.send("click", {}).catch(() => {});
+        } else if (!pinching) {
+          pinchHoldRef.current.desktopFired = false;
+        }
+      }
+
       brain.set({
         cursor: { x, y, visible: true, pinching },
         fingers,
@@ -132,8 +191,14 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
     init();
     return () => {
       cancelled = true;
+      unsub();
       try { camRef.current?.stop?.(); } catch {}
       try { handsRef.current?.close?.(); } catch {}
+      const v = videoRef.current;
+      if (v?.srcObject) {
+        (v.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+        v.srcObject = null;
+      }
       brain.set({ cameraReady: false });
     };
   }, [videoRef]);

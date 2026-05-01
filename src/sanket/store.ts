@@ -25,6 +25,7 @@ type State = {
   active: boolean;
   listening: boolean;
   mouseEnabled: boolean;
+  cameraEnabled: boolean;
   cameraReady: boolean;
   cursor: { x: number; y: number; visible: boolean; pinching: boolean };
   lastCommand: string;
@@ -41,6 +42,7 @@ let state: State = {
   active: false,
   listening: false,
   mouseEnabled: true,
+  cameraEnabled: true,
   cameraReady: false,
   cursor: { x: window.innerWidth / 2, y: window.innerHeight / 2, visible: false, pinching: false },
   lastCommand: "",
