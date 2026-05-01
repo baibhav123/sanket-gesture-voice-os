@@ -151,21 +151,16 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         pinchHoldRef.current.down = false;
       }
 
-      // Forward to real desktop mouse (relative move) when agent online
+      // Forward to real desktop mouse — ABSOLUTE normalized coords (accurate tracking)
       if (desktop.isOnline()) {
-        const prevPos = lastDesktopRef.current;
-        if (prevPos) {
-          const dx = (x - prevPos.x) * 1.4; // amplify
-          const dy = (y - prevPos.y) * 1.4;
-          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-            const now = performance.now();
-            if (now - lastSendRef.current > 30) {
-              lastSendRef.current = now;
-              desktop.send("move_rel", { dx, dy }).catch(() => {});
-            }
-          }
+        const now = performance.now();
+        if (now - lastSendRef.current > 30) {
+          lastSendRef.current = now;
+          // mirror X (selfie view) so moving hand right moves cursor right
+          const nx = 1 - idx.x;
+          const ny = idx.y;
+          desktop.send("move_norm", { nx, ny }).catch(() => {});
         }
-        lastDesktopRef.current = { x, y };
         if (pinching && !pinchHoldRef.current.desktopFired) {
           pinchHoldRef.current.desktopFired = true;
           desktop.send("click", {}).catch(() => {});

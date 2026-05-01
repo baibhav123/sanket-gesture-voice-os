@@ -437,6 +437,7 @@ ACTION_REGISTRY = {
     "click": mouse_click,
     "move": mouse_move,
     "move_rel": mouse_move_rel,
+    "move_norm": mouse_move_norm,
     "scroll": scroll,
     "screenshot": screenshot,
     "volume": volume,
