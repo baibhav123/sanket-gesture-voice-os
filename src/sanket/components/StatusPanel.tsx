@@ -20,10 +20,13 @@ function Reticle() {
 }
 
 export function StatusPanel() {
-  const { active, listening, mouseEnabled, cameraReady, fingers, thinking } = useBrain((s) => ({
-    active: s.active, listening: s.listening, mouseEnabled: s.mouseEnabled,
-    cameraReady: s.cameraReady, fingers: s.fingers, thinking: s.thinking,
-  }));
+  const active = useBrain((s) => s.active);
+  const listening = useBrain((s) => s.listening);
+  const mouseEnabled = useBrain((s) => s.mouseEnabled);
+  const cameraReady = useBrain((s) => s.cameraReady);
+  const fingers = useBrain((s) => s.fingers);
+  const thinking = useBrain((s) => s.thinking);
+  const desktopLink = useBrain((s) => s.desktopLink);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, []);
 
@@ -41,6 +44,15 @@ export function StatusPanel() {
         <div><span className={dot(cameraReady)} />CAM</div>
         <div><span className={dot(mouseEnabled && active)} />GST</div>
         <div><span className={dot(thinking)} />AI</div>
+      </div>
+      <div className={`w-full text-[10px] font-mono px-2 py-1.5 border ${desktopLink ? "border-hud-cyan/60 text-hud-cyan text-glow" : "border-hud-red/40 text-hud-red/80"}`}>
+        <div className="flex items-center justify-between">
+          <span className="tracking-widest">DESKTOP.LINK</span>
+          <span className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${desktopLink ? "bg-hud-cyan animate-hud-pulse" : "bg-hud-red"}`} />
+            {desktopLink ? "ONLINE" : "OFFLINE"}
+          </span>
+        </div>
       </div>
       <div className="w-full text-[10px] font-mono space-y-1 pt-2 border-t border-hud-cyan/20">
         <div className="flex justify-between"><span className="text-foreground/50">TIME</span><span className="text-glow">{now.toLocaleTimeString("en-GB")}</span></div>
