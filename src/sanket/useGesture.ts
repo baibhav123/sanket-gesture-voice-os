@@ -24,7 +24,9 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
   const handsRef = useRef<any>(null);
   const camRef = useRef<any>(null);
   const smoothRef = useRef<{ x: number; y: number } | null>(null);
-  const pinchHoldRef = useRef<{ down: boolean; lastClick: number }>({ down: false, lastClick: 0 });
+  const lastDesktopRef = useRef<{ x: number; y: number } | null>(null);
+  const lastSendRef = useRef<number>(0);
+  const pinchHoldRef = useRef<{ down: boolean; lastClick: number; desktopFired: boolean }>({ down: false, lastClick: 0, desktopFired: false });
 
   useEffect(() => {
     let cancelled = false;
@@ -147,6 +149,29 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         }
       } else if (!pinching) {
         pinchHoldRef.current.down = false;
+      }
+
+      // Forward to real desktop mouse (relative move) when agent online
+      if (desktop.isOnline()) {
+        const prevPos = lastDesktopRef.current;
+        if (prevPos) {
+          const dx = (x - prevPos.x) * 1.4; // amplify
+          const dy = (y - prevPos.y) * 1.4;
+          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            const now = performance.now();
+            if (now - lastSendRef.current > 30) {
+              lastSendRef.current = now;
+              desktop.send("move_rel", { dx, dy }).catch(() => {});
+            }
+          }
+        }
+        lastDesktopRef.current = { x, y };
+        if (pinching && !pinchHoldRef.current.desktopFired) {
+          pinchHoldRef.current.desktopFired = true;
+          desktop.send("click", {}).catch(() => {});
+        } else if (!pinching) {
+          pinchHoldRef.current.desktopFired = false;
+        }
       }
 
       brain.set({
