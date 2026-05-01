@@ -34,6 +34,7 @@ type State = {
   windows: OpenWindow[];
   zCounter: number;
   fingers: number;
+  desktopLink: boolean;
 };
 
 let state: State = {
@@ -49,6 +50,7 @@ let state: State = {
   windows: [],
   zCounter: 10,
   fingers: 0,
+  desktopLink: false,
 };
 
 const listeners = new Set<() => void>();
