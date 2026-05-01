@@ -1,6 +1,7 @@
-// MediaPipe Hands via CDN — virtual cursor + pinch click
+// MediaPipe Hands via CDN — virtual cursor + pinch click + real-desktop mouse forwarding
 import { useEffect, useRef } from "react";
 import { brain } from "./store";
+import { desktop } from "./desktop";
 
 declare global { interface Window { Hands?: any; Camera?: any; } }
 
