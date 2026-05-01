@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useVoice } from "@/sanket/useVoice";
 import { useGesture } from "@/sanket/useGesture";
 import { useBrain, brain } from "@/sanket/store";
+import { desktop } from "@/sanket/desktop";
 import { VirtualCursor } from "@/sanket/components/VirtualCursor";
 import { SystemLog } from "@/sanket/components/SystemLog";
 import { StatusPanel } from "@/sanket/components/StatusPanel";
@@ -20,6 +21,7 @@ const Index = () => {
   useEffect(() => {
     document.title = "SanketX 2047 — Voice + Gesture OS";
     brain.log("system", "// SANKETX 2047 BOOT // STANDBY MODE");
+    desktop.connect();
   }, []);
 
   // Auto-start mic when system activates
