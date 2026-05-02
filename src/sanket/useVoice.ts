@@ -28,7 +28,17 @@ export function useVoice() {
       },
     });
     recRef.current = rec;
-    return () => rec.stop();
+    const pauseForSpeech = () => rec.stop();
+    const resumeAfterSpeech = () => {
+      if (brain.get().listening) setTimeout(() => rec.start(), 950);
+    };
+    window.addEventListener("jarvis:speech-start", pauseForSpeech);
+    window.addEventListener("jarvis:speech-end", resumeAfterSpeech);
+    return () => {
+      window.removeEventListener("jarvis:speech-start", pauseForSpeech);
+      window.removeEventListener("jarvis:speech-end", resumeAfterSpeech);
+      rec.stop();
+    };
   }, []);
 
   return {
