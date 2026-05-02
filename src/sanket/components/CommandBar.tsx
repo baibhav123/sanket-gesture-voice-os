@@ -1,7 +1,8 @@
 import { useBrain, brain } from "@/sanket/store";
 import { handleCommand } from "@/sanket/commands";
-import { Mic, MicOff, Power, Send, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, Power, Send, Video, VideoOff, HelpCircle } from "lucide-react";
 import { useState } from "react";
+import { VoiceCommandsPanel } from "./VoiceCommandsPanel";
 
 export function CommandBar({ voice }: { voice: { start: () => void; stop: () => void } }) {
   const active = useBrain((s) => s.active);
