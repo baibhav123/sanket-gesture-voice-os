@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { createRecognition } from "./speech";
+import { createRecognition, isJarvisSpeaking } from "./speech";
 import { brain } from "./store";
 import { handleCommand } from "./commands";
 
@@ -10,6 +10,7 @@ export function useVoice() {
   useEffect(() => {
     const rec = createRecognition({
       onResult: (text, isFinal) => {
+        if (isJarvisSpeaking()) return;
         if (isFinal && text && text !== lastFinal.current) {
           lastFinal.current = text;
           handleCommand(text);
