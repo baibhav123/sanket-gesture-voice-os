@@ -70,24 +70,44 @@ export async function handleCommand(raw: string) {
   if (/whatsapp/.test(text) || /^send\s+.+\s+to\s+.+/.test(text)) {
     let phone = ""; let message = ""; let contactName = "";
 
+    const directWhatsApp = text.match(/(?:open\s+)?whatsapp\s+(?:app\s+)?(?:and\s+)?send\s+(.+?)\s+to\s+(.+)$/);
+    if (directWhatsApp) {
+      message = directWhatsApp[1].trim();
+      const target = directWhatsApp[2].replace(/\s+on\s+whatsapp$/, "").trim();
+      if (/^\+?\d[\d\s-]{7,}$/.test(target)) phone = target.replace(/[\s-]/g, "");
+      else contactName = target;
+      const c = contactName ? contacts.find(contactName) : null;
+      if (c) phone = c.phone;
+    }
+
     // 1) explicit phone number
-    const numMatch = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+(\+?\d[\d\s-]{7,})/) ||
-                     text.match(/whatsapp\s+(\+?\d[\d\s-]{7,})\s+(?:saying\s+|message\s+)?(.+)/);
+    const numMatch = !message && (text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+(\+?\d[\d\s-]{7,})/) ||
+                     text.match(/whatsapp\s+(\+?\d[\d\s-]{7,})\s+(?:saying\s+|message\s+)?(.+)/));
     if (numMatch) {
       const [, a, b] = numMatch;
       phone = (b.match(/^\+?\d/) ? b : a).replace(/[\s-]/g, "");
       message = (b.match(/^\+?\d/) ? a : b).trim();
-    } else {
+    } else if (!message) {
       // 2) contact name patterns
       const m1 = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+([a-z][a-z\s]*?)(?:\s+on\s+whatsapp)?$/);
-      const m2 = text.match(/whatsapp\s+([a-z][a-z\s]*?)\s+(?:saying\s+|message\s+)?(.+)/);
+      const m2 = text.match(/^whatsapp\s+(.+)$/);
       if (m1) { message = m1[1].trim(); contactName = m1[2].trim(); }
-      else if (m2) { contactName = m2[1].trim(); message = m2[2].trim(); }
+      else if (m2) {
+        const rest = m2[1].replace(/^(?:saying|message)\s+/, "").trim();
+        const saved = contacts.list().find((c) => rest.startsWith(c.name.toLowerCase() + " "));
+        if (saved) {
+          contactName = saved.name;
+          message = rest.slice(saved.name.length).trim();
+        } else {
+          const parts = rest.split(/\s+/);
+          contactName = parts.shift() || "";
+          message = parts.join(" ").trim();
+        }
+      }
 
       if (contactName) {
         const c = contacts.find(contactName);
-        if (!c) return respond(`No contact named ${contactName}. Say "save contact ${contactName} +91…" first.`);
-        phone = c.phone;
+        if (c) phone = c.phone;
       }
     }
 
@@ -95,6 +115,10 @@ export async function handleCommand(raw: string) {
       phone = phone.startsWith("+") ? phone : "+" + phone;
       return desktopAction("whatsapp", { phone, message },
         `Dispatching WhatsApp to ${contactName || phone}.`);
+    }
+    if (contactName && message) {
+      return desktopAction("whatsapp_contact", { name: contactName, message },
+        `Opening WhatsApp app, searching ${contactName}, and sending your message.`);
     }
   }
 

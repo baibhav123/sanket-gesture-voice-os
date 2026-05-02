@@ -76,6 +76,9 @@ def _platform_key():
 
 def _try_launch_native(name):
     """Returns True if a native app was successfully launched."""
+    if name == "whatsapp" and _open_whatsapp_native():
+        return True
+
     entry = APP_REGISTRY.get(name, {})
     candidates = entry.get(_platform_key(), [])
     for cand in candidates:
@@ -98,6 +101,19 @@ def _try_launch_native(name):
         except Exception:
             continue
     return False
+
+
+def _open_whatsapp_native() -> bool:
+    """Open WhatsApp Desktop only. If no native URI handler exists, return False."""
+    try:
+        if IS_WINDOWS:
+            os.startfile("whatsapp://")
+            return True
+        if IS_MAC:
+            return subprocess.run(["open", "whatsapp://"], capture_output=True).returncode == 0
+        return subprocess.run(["xdg-open", "whatsapp://"], capture_output=True).returncode == 0
+    except Exception:
+        return False
 
 
 def open_app(params):
@@ -186,6 +202,40 @@ def _whatsapp_native(phone: str, message: str) -> bool:
             return r.returncode == 0
     except Exception:
         return False
+
+
+def whatsapp_contact(params):
+    """Open WhatsApp Desktop, search a contact/business name, paste message, and send."""
+    name = (params.get("name") or "").strip()
+    message = (params.get("message") or "").strip()
+    if not name:
+        raise ValueError("contact name required")
+    if not _open_whatsapp_native():
+        raise RuntimeError("WhatsApp Desktop app not found. Install/login to WhatsApp Desktop first.")
+    _need_pyauto()
+    time.sleep(float(params.get("open_wait", 3.0)))
+    if IS_MAC:
+        pyautogui.hotkey("command", "n")
+    else:
+        pyautogui.hotkey("ctrl", "n")
+    time.sleep(0.3)
+    if HAS_CLIP:
+        pyperclip.copy(name)
+        pyautogui.hotkey("command", "v") if IS_MAC else pyautogui.hotkey("ctrl", "v")
+    else:
+        pyautogui.typewrite(name, interval=0.02)
+    time.sleep(float(params.get("search_wait", 1.2)))
+    pyautogui.press("enter")
+    time.sleep(0.8)
+    if message:
+        if HAS_CLIP:
+            pyperclip.copy(message)
+            pyautogui.hotkey("command", "v") if IS_MAC else pyautogui.hotkey("ctrl", "v")
+        else:
+            pyautogui.typewrite(message, interval=0.02)
+        time.sleep(0.2)
+        pyautogui.press("enter")
+    return f"whatsapp contact -> {name}"
 
 
 def whatsapp_send(params):
@@ -278,9 +328,10 @@ def mouse_move_norm(params):
     nx = float(params.get("nx", 0.5))
     ny = float(params.get("ny", 0.5))
     sw, sh = pyautogui.size()
-    x = int(max(0, min(1, nx)) * sw)
-    y = int(max(0, min(1, ny)) * sh)
-    pyautogui.moveTo(x, y, duration=0)
+    margin = int(params.get("margin", 2))
+    x = int(max(0, min(1, nx)) * max(1, sw - 1 - margin * 2) + margin)
+    y = int(max(0, min(1, ny)) * max(1, sh - 1 - margin * 2) + margin)
+    pyautogui.moveTo(x, y, duration=float(params.get("duration", 0)))
     return f"abs {x},{y}"
 
 
@@ -432,6 +483,7 @@ ACTION_REGISTRY = {
     "web_search": web_search,
     "youtube": youtube_play,
     "whatsapp": whatsapp_send,
+    "whatsapp_contact": whatsapp_contact,
     "type": type_text,
     "press": press_key,
     "click": mouse_click,

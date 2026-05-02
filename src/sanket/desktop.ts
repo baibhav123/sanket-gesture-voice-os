@@ -80,6 +80,16 @@ class DesktopBridge {
       }, 30000);
     });
   }
+
+  fire(action: string, params: Record<string, any> = {}) {
+    if (!this.isOnline()) return false;
+    try {
+      this.ws!.send(JSON.stringify({ action, params }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 export const desktop = new DesktopBridge();

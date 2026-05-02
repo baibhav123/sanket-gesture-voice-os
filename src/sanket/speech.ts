@@ -5,6 +5,12 @@ export type SpeechRec = {
   supported: boolean;
 };
 
+const speechState = { speaking: false, ignoreUntil: 0 };
+
+export function isJarvisSpeaking() {
+  return speechState.speaking || Date.now() < speechState.ignoreUntil;
+}
+
 export function createRecognition(opts: {
   onResult: (text: string, isFinal: boolean) => void;
   onError?: (err: string) => void;
@@ -61,7 +67,20 @@ export function speak(text: string) {
   u.rate = 1.0;
   u.pitch = 0.9;
   u.volume = 1;
+  speechState.speaking = true;
+  speechState.ignoreUntil = Date.now() + Math.max(1800, text.length * 75);
+  u.onend = () => {
+    speechState.speaking = false;
+    speechState.ignoreUntil = Date.now() + 900;
+    window.dispatchEvent(new Event("jarvis:speech-end"));
+  };
+  u.onerror = () => {
+    speechState.speaking = false;
+    speechState.ignoreUntil = Date.now() + 900;
+    window.dispatchEvent(new Event("jarvis:speech-end"));
+  };
   window.speechSynthesis.cancel();
+  window.dispatchEvent(new Event("jarvis:speech-start"));
   window.speechSynthesis.speak(u);
 }
 
