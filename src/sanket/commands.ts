@@ -3,6 +3,7 @@ import { speak } from "./speech";
 import { supabase } from "@/integrations/supabase/client";
 import { desktop } from "./desktop";
 import { contacts } from "./contacts";
+import { numberOverlay, parseSpokenNumber } from "./numberOverlay";
 
 const APP_KEYWORDS: Record<string, AppId> = {
   search: "search", google: "search",
