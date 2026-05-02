@@ -4,7 +4,7 @@ The Python bridge that lets the **SanketX HUD** (browser) actually **control you
 open WhatsApp, send messages, launch apps, type, click, take screenshots, control volume,
 even shut down the system. All by **voice**.
 
-> Architecture: Browser HUD ⇄ WebSocket (`ws://localhost:8765`) ⇄ Python Agent ⇄ Your OS
+> Architecture: Browser HUD ⇄ HTTP (`http://localhost:5000/command`) ⇄ Python Agent ⇄ Your OS
 
 ---
 
@@ -24,7 +24,7 @@ chmod +x start.sh
 That's it. The script will:
 1. Create a virtual environment (`.venv/`)
 2. Install dependencies
-3. Launch the agent on `ws://localhost:8765`
+3. Launch the agent on `http://localhost:5000`
 
 Then open the **SanketX web app** — the HUD will show a green **DESKTOP LINK · ONLINE** badge,
 meaning your browser is now wired to your real laptop. 🟢
@@ -61,19 +61,27 @@ python agent.py
 
 ---
 
-## 🔌 Action Protocol (advanced)
+## 🔌 HTTP Protocol
 
-The HUD sends JSON over WebSocket:
-```json
-{ "id": "abc123", "action": "open_app", "params": { "name": "chrome" } }
+The HUD sends JSON over HTTP POST:
+```bash
+curl -X POST http://localhost:5000/command \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"open youtube and search cats"}'
 ```
 Agent replies:
 ```json
-{ "type": "result", "id": "abc123", "ok": true, "result": "launched chrome" }
+{ "ok": true, "action": "youtube", "result": "youtube: cats" }
+```
+
+You can also pass a structured action directly:
+```json
+{ "command": "whatsapp", "phone": "+919876543210", "message": "hi" }
 ```
 
 **Available actions:** `ping`, `open_app`, `close_app`, `open_url`, `web_search`, `youtube`,
-`whatsapp`, `type`, `press`, `click`, `move`, `scroll`, `screenshot`, `volume`, `system`.
+`whatsapp`, `whatsapp_contact`, `type`, `press`, `click`, `move`, `move_norm`, `scroll`,
+`screenshot`, `volume`, `system`, `mouse_on`, `mouse_off`.
 
 See `actions.py` to add your own.
 

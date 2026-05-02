@@ -473,6 +473,18 @@ def ping(_params):
     return {"pong": True, "time": time.time(), "platform": platform.system()}
 
 
+# ---------- Mouse-control toggles (status flags consumed by the web HUD) ----------
+_MOUSE_STATE = {"enabled": True}
+
+def mouse_on(_params):
+    _MOUSE_STATE["enabled"] = True
+    return "MOUSE ENABLED"
+
+def mouse_off(_params):
+    _MOUSE_STATE["enabled"] = False
+    return "MOUSE DISABLED"
+
+
 # ---------- Registry ----------
 
 ACTION_REGISTRY = {
@@ -499,6 +511,8 @@ ACTION_REGISTRY = {
     "clipboard_get": clipboard_get,
     "list_files": list_files,
     "open_file": open_file,
+    "mouse_on": mouse_on,
+    "mouse_off": mouse_off,
 }
 
 

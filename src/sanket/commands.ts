@@ -168,13 +168,15 @@ export async function handleCommand(raw: string) {
     return desktopAction("open_url", { url: urlMatch[1] }, `Opening ${urlMatch[1]}.`);
   }
 
-  // Mouse / camera toggles
-  if (/(disable|stop|pause|turn off)\s+(mouse|gesture|hand)/.test(text)) {
+  // Mouse / camera toggles (also notify the desktop agent)
+  if (/(disable|stop|pause|turn off)\s+(mouse|gesture|hand)/.test(text) || /^mouse\s*off$/.test(text)) {
     brain.set({ mouseEnabled: false });
+    if (desktop.isOnline()) desktop.fire("mouse_off", {});
     return respond("Gesture control disabled.");
   }
-  if (/(enable|start|resume|turn on)\s+(mouse|gesture|hand)/.test(text)) {
+  if (/(enable|start|resume|turn on)\s+(mouse|gesture|hand)/.test(text) || /^mouse\s*on$/.test(text)) {
     brain.set({ mouseEnabled: true });
+    if (desktop.isOnline()) desktop.fire("mouse_on", {});
     return respond("Gesture control online.");
   }
   if (/(turn off|stop|disable)\s+camera/.test(text)) {
