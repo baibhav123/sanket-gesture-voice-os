@@ -72,12 +72,15 @@ export function speak(text: string) {
   u.onend = () => {
     speechState.speaking = false;
     speechState.ignoreUntil = Date.now() + 900;
+    window.dispatchEvent(new Event("jarvis:speech-end"));
   };
   u.onerror = () => {
     speechState.speaking = false;
     speechState.ignoreUntil = Date.now() + 900;
+    window.dispatchEvent(new Event("jarvis:speech-end"));
   };
   window.speechSynthesis.cancel();
+  window.dispatchEvent(new Event("jarvis:speech-start"));
   window.speechSynthesis.speak(u);
 }
 
