@@ -13,6 +13,7 @@ export function CommandBar({ voice }: { voice: { start: () => void; stop: () => 
   const lastResponse = useBrain((s) => s.lastResponse);
   const thinking = useBrain((s) => s.thinking);
   const [text, setText] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
 
   const toggleCamera = () => {
     const next = !cameraEnabled;
