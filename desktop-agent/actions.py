@@ -215,9 +215,9 @@ def whatsapp_contact(params):
     _need_pyauto()
     time.sleep(float(params.get("open_wait", 3.0)))
     if IS_MAC:
-        pyautogui.hotkey("command", "f")
+        pyautogui.hotkey("command", "n")
     else:
-        pyautogui.hotkey("ctrl", "f")
+        pyautogui.hotkey("ctrl", "n")
     time.sleep(0.3)
     if HAS_CLIP:
         pyperclip.copy(name)
