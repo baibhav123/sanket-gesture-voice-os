@@ -86,8 +86,7 @@ export async function handleCommand(raw: string) {
 
       if (contactName) {
         const c = contacts.find(contactName);
-        if (!c) return respond(`No contact named ${contactName}. Say "save contact ${contactName} +91…" first.`);
-        phone = c.phone;
+        if (c) phone = c.phone;
       }
     }
 
@@ -95,6 +94,10 @@ export async function handleCommand(raw: string) {
       phone = phone.startsWith("+") ? phone : "+" + phone;
       return desktopAction("whatsapp", { phone, message },
         `Dispatching WhatsApp to ${contactName || phone}.`);
+    }
+    if (contactName && message) {
+      return desktopAction("whatsapp_contact", { name: contactName, message },
+        `Opening WhatsApp app, searching ${contactName}, and sending your message.`);
     }
   }
 
