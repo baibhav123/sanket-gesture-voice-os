@@ -38,7 +38,42 @@ export async function handleCommand(raw: string) {
   }
   if (!brain.get().active) return;
 
-  // ===== CODE WRITING =====
+  // ===== MAC VOICE CONTROL :: SHOW NUMBERS / SHOW GRID =====
+  if (/^(show|display)\s+numbers?$/.test(text) || /^numbers?\s+(on|please)$/.test(text)) {
+    numberOverlay.showNumbers();
+    return respond("Numbers shown. Say a number to click.");
+  }
+  if (/^(hide|remove|clear)\s+numbers?$/.test(text) || /^numbers?\s+off$/.test(text)) {
+    numberOverlay.hideNumbers();
+    return respond("Numbers hidden.");
+  }
+  if (/^(show|display)\s+grid$/.test(text)) {
+    numberOverlay.showGrid();
+    return respond("Grid shown. Say a number from one to nine.");
+  }
+  if (/^(hide|remove|clear)\s+grid$/.test(text) || /^grid\s+off$/.test(text)) {
+    numberOverlay.hideGrid();
+    return respond("Grid hidden.");
+  }
+
+  // "click 5" / "click five" / "double click 3" / "right click two" / "open 4" / "tap 7"
+  if (numberOverlay.isNumbersOn() || numberOverlay.isGridOn()) {
+    const m = text.match(/^(?:(double[\s-]?click|right[\s-]?click|click|open|tap|select|press)\s+)?(?:number\s+)?([a-z0-9]+)$/);
+    if (m) {
+      const verb = (m[1] || "click").replace(/[\s-]/g, "");
+      const n = parseSpokenNumber(m[2]);
+      if (n !== null) {
+        const kind: "click" | "doubleclick" | "rightclick" =
+          verb === "doubleclick" ? "doubleclick" :
+          verb === "rightclick" ? "rightclick" : "click";
+        const ok = numberOverlay.isGridOn()
+          ? numberOverlay.activateGridCell(n, kind)
+          : numberOverlay.activate(n, kind);
+        return respond(ok ? `${kind === "doubleclick" ? "Double clicking" : kind === "rightclick" ? "Right clicking" : "Clicking"} ${n}.` : `No item ${n}.`);
+      }
+    }
+  }
+
   // "write code for a calculator in python" / "code a snake game in javascript"
   // "copy code for X" -> clipboard
   const codeMatch = text.match(/^(?:write|generate|make|create|build|code|copy)\s+(?:the\s+)?code\s+(?:for\s+)?(.+)/);
