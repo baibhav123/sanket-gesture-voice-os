@@ -24,7 +24,7 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
   const handsRef = useRef<any>(null);
   const camRef = useRef<any>(null);
   const smoothRef = useRef<{ x: number; y: number } | null>(null);
-  const lastDesktopRef = useRef<{ x: number; y: number } | null>(null);
+  const lastDesktopRef = useRef<{ nx: number; ny: number } | null>(null);
   const lastSendRef = useRef<number>(0);
   const pinchHoldRef = useRef<{ down: boolean; lastClick: number; desktopFired: boolean }>({ down: false, lastClick: 0, desktopFired: false });
 
@@ -153,19 +153,21 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         pinchHoldRef.current.down = false;
       }
 
-      // Forward to real desktop mouse — ABSOLUTE normalized coords (accurate tracking)
+      // Forward to real desktop mouse — fast fire-and-forget, so cursor movement never waits for agent replies.
       if (desktop.isOnline()) {
         const now = performance.now();
-        if (now - lastSendRef.current > 30) {
+        const nx = 1 - idx.x;
+        const ny = idx.y;
+        const last = lastDesktopRef.current;
+        const moved = !last || Math.hypot(nx - last.nx, ny - last.ny) > 0.004;
+        if (moved && now - lastSendRef.current > 16) {
           lastSendRef.current = now;
-          // mirror X (selfie view) so moving hand right moves cursor right
-          const nx = 1 - idx.x;
-          const ny = idx.y;
-          desktop.send("move_norm", { nx, ny }).catch(() => {});
+          lastDesktopRef.current = { nx, ny };
+          desktop.fire("move_norm", { nx, ny, duration: 0 });
         }
         if (pinching && !pinchHoldRef.current.desktopFired) {
           pinchHoldRef.current.desktopFired = true;
-          desktop.send("click", {}).catch(() => {});
+          desktop.fire("click", {});
         } else if (!pinching) {
           pinchHoldRef.current.desktopFired = false;
         }
