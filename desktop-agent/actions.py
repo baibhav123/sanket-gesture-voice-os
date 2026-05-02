@@ -296,11 +296,13 @@ def mouse_click(params):
     _need_pyauto()
     x = params.get("x"); y = params.get("y")
     button = params.get("button", "left")
+    clicks = int(params.get("clicks", 1))
+    interval = float(params.get("interval", 0.08))
     if x is not None and y is not None:
-        pyautogui.click(x=int(x), y=int(y), button=button)
+        pyautogui.click(x=int(x), y=int(y), button=button, clicks=clicks, interval=interval)
     else:
-        pyautogui.click(button=button)
-    return "clicked"
+        pyautogui.click(button=button, clicks=clicks, interval=interval)
+    return f"clicked x{clicks} ({button})"
 
 
 def mouse_move(params):

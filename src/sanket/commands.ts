@@ -146,6 +146,59 @@ export async function handleCommand(raw: string) {
     return desktopAction("system", { what }, `Executing system ${what}.`);
   }
 
+  // ===== MAC VOICE-CONTROL STYLE =====
+  // Mouse clicks
+  if (/^(double[\s-]?click|click twice)\b/.test(text))
+    return desktopAction("click", { button: "left", clicks: 2 }, "Double click.");
+  if (/^right[\s-]?click\b/.test(text))
+    return desktopAction("click", { button: "right" }, "Right click.");
+  if (/^(click|tap|select)\b(?!\s+(?:on|the))/.test(text) || /^click\s+(here|that|it)?$/.test(text))
+    return desktopAction("click", { button: "left" }, "Click.");
+
+  // Scroll
+  if (/scroll\s+up/.test(text)) return desktopAction("scroll", { amount: 400 }, "Scrolling up.");
+  if (/scroll\s+down/.test(text)) return desktopAction("scroll", { amount: -400 }, "Scrolling down.");
+  if (/^page\s+up/.test(text)) return desktopAction("press", { key: "pageup" }, "Page up.");
+  if (/^page\s+down/.test(text)) return desktopAction("press", { key: "pagedown" }, "Page down.");
+
+  // Single keys: enter, escape, space, tab, backspace, delete, arrow keys
+  const singleKey = text.match(/^(?:press\s+|hit\s+)?(enter|return|escape|esc|space|tab|backspace|delete|up|down|left|right|home|end)\s*(?:key)?$/);
+  if (singleKey) {
+    const k = singleKey[1].replace("return", "enter").replace("esc", "escape");
+    return desktopAction("press", { key: k }, `Pressed ${k}.`);
+  }
+
+  // Mac-style shortcuts → cross-platform (mac uses command, others ctrl)
+  const isMac = /Mac/i.test(navigator.platform);
+  const META = isMac ? "command" : "ctrl";
+  const SHORTCUTS: [RegExp, string[], string][] = [
+    [/^(copy(\s+that|\s+it)?|copy\s+selection)$/, [META, "c"], "Copied."],
+    [/^paste(\s+that|\s+it|\s+here)?$/,           [META, "v"], "Pasted."],
+    [/^cut(\s+that|\s+it)?$/,                     [META, "x"], "Cut."],
+    [/^select\s+all$/,                             [META, "a"], "Select all."],
+    [/^undo(\s+that)?$/,                           [META, "z"], "Undo."],
+    [/^redo(\s+that)?$/,                           [META, "shift", "z"], "Redo."],
+    [/^save(\s+(file|it|that))?$/,                 [META, "s"], "Saved."],
+    [/^new\s+tab$/,                                [META, "t"], "New tab."],
+    [/^close\s+tab$/,                              [META, "w"], "Tab closed."],
+    [/^reopen\s+tab$/,                             [META, "shift", "t"], "Reopened tab."],
+    [/^next\s+tab$/,                               [META, "alt", "right"], "Next tab."],
+    [/^previous\s+tab|prev\s+tab$/,                [META, "alt", "left"], "Previous tab."],
+    [/^new\s+window$/,                             [META, "n"], "New window."],
+    [/^close\s+window$/,                           [META, "w"], "Window closed."],
+    [/^(switch\s+app|next\s+window|cycle\s+apps?)$/, [META, "tab"], "Switching app."],
+    [/^(open\s+spotlight|spotlight\s+search)$/,    [META, "space"], "Spotlight."],
+    [/^find(\s+in\s+page)?$/,                      [META, "f"], "Find."],
+    [/^refresh(\s+page)?|reload(\s+page)?$/,       [META, "r"], "Refreshing."],
+    [/^zoom\s+in$/,                                 [META, "="], "Zoom in."],
+    [/^zoom\s+out$/,                                [META, "-"], "Zoom out."],
+    [/^show\s+desktop$/,                            [isMac ? "f11" : "win", isMac ? "f11" : "d"], "Showing desktop."],
+    [/^mission\s+control$/,                         ["ctrl", "up"], "Mission control."],
+  ];
+  for (const [re, keys, msg] of SHORTCUTS) {
+    if (re.test(text)) return desktopAction("press", { key: keys }, msg);
+  }
+
   const typeMatch = text.match(/^(?:type|write)\s+(.+)/);
   if (typeMatch && !codeMatch) {
     return desktopAction("type", { text: typeMatch[1] }, `Typing.`);

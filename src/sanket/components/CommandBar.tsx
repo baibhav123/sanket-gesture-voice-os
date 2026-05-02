@@ -1,7 +1,8 @@
 import { useBrain, brain } from "@/sanket/store";
 import { handleCommand } from "@/sanket/commands";
-import { Mic, MicOff, Power, Send, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, Power, Send, Video, VideoOff, HelpCircle } from "lucide-react";
 import { useState } from "react";
+import { VoiceCommandsPanel } from "./VoiceCommandsPanel";
 
 export function CommandBar({ voice }: { voice: { start: () => void; stop: () => void } }) {
   const active = useBrain((s) => s.active);
@@ -12,6 +13,7 @@ export function CommandBar({ voice }: { voice: { start: () => void; stop: () => 
   const lastResponse = useBrain((s) => s.lastResponse);
   const thinking = useBrain((s) => s.thinking);
   const [text, setText] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
 
   const toggleCamera = () => {
     const next = !cameraEnabled;
@@ -84,6 +86,16 @@ export function CommandBar({ voice }: { voice: { start: () => void; stop: () => 
         />
         <button type="submit" className="text-hud-cyan hover:text-glow"><Send className="w-3.5 h-3.5" /></button>
       </form>
+
+      <button
+        onClick={() => setShowHelp(true)}
+        className="shrink-0 w-10 h-10 rounded-full border-2 border-hud-cyan/60 text-hud-cyan/80 hover:bg-hud-cyan/10 hover:text-glow flex items-center justify-center transition-all"
+        title="What can I say? (voice command list)"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </button>
+
+      {showHelp && <VoiceCommandsPanel onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
