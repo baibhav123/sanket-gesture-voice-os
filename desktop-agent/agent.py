@@ -59,24 +59,30 @@ async def handle_client(ws):
             action = msg.get("action")
             params = msg.get("params", {}) or {}
             req_id = msg.get("id")
-            log("CMD", f"{action}  {params}")
+            noisy = action in {"move_norm", "move_rel", "move"} and req_id is None
+            if not noisy:
+                log("CMD", f"{action}  {params}")
 
             try:
                 result = await asyncio.get_event_loop().run_in_executor(
                     None, execute_action, action, params
                 )
-                await ws.send(json.dumps({
-                    "type": "result", "id": req_id,
-                    "action": action, "ok": True, "result": result,
-                }))
-                log("OK", f"{action} -> {result}")
+                if req_id is not None:
+                    await ws.send(json.dumps({
+                        "type": "result", "id": req_id,
+                        "action": action, "ok": True, "result": result,
+                    }))
+                if not noisy:
+                    log("OK", f"{action} -> {result}")
             except Exception as e:
                 err = f"{type(e).__name__}: {e}"
-                log("ERR", err)
-                await ws.send(json.dumps({
-                    "type": "result", "id": req_id,
-                    "action": action, "ok": False, "error": err,
-                }))
+                if not noisy:
+                    log("ERR", err)
+                if req_id is not None:
+                    await ws.send(json.dumps({
+                        "type": "result", "id": req_id,
+                        "action": action, "ok": False, "error": err,
+                    }))
     except websockets.ConnectionClosed:
         pass
     except Exception:
