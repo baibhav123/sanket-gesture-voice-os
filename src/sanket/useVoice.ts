@@ -18,7 +18,7 @@ export function useVoice() {
       },
       onEnd: () => {
         // auto-restart while listening flag is on
-        if (brain.get().listening) setTimeout(() => rec.start(), 400);
+        if (brain.get().listening && !isJarvisSpeaking()) setTimeout(() => rec.start(), 400);
       },
       onError: (err) => {
         if (err === "not-allowed") {
