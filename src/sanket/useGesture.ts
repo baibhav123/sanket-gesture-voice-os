@@ -111,7 +111,9 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
 
     function onResults(res: any) {
       const s = brain.get();
-      if (!s.active || !s.mouseEnabled) {
+      // Cursor tracks the hand whenever the camera is on and mouse control is enabled.
+      // (Decoupled from `active` so you don't have to "wake jarvis" just to move the pointer.)
+      if (!s.mouseEnabled || !s.cameraEnabled) {
         brain.set({ cursor: { ...s.cursor, visible: false }, fingers: 0 });
         return;
       }

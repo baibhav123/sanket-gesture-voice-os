@@ -2,7 +2,7 @@ import { useBrain } from "@/sanket/store";
 
 export function VirtualCursor() {
   const cursor = useBrain((s) => s.cursor);
-  const active = useBrain((s) => s.active && s.mouseEnabled);
+  const active = useBrain((s) => s.mouseEnabled && s.cameraEnabled);
   if (!active || !cursor.visible) return null;
   const size = cursor.pinching ? 28 : 44;
   return (
