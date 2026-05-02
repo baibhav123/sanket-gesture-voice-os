@@ -76,6 +76,8 @@ export async function handleCommand(raw: string) {
       const target = directWhatsApp[2].replace(/\s+on\s+whatsapp$/, "").trim();
       if (/^\+?\d[\d\s-]{7,}$/.test(target)) phone = target.replace(/[\s-]/g, "");
       else contactName = target;
+      const c = contactName ? contacts.find(contactName) : null;
+      if (c) phone = c.phone;
     }
 
     // 1) explicit phone number
@@ -88,9 +90,20 @@ export async function handleCommand(raw: string) {
     } else if (!message) {
       // 2) contact name patterns
       const m1 = text.match(/(?:send|whatsapp)\s+(.+?)\s+to\s+([a-z][a-z\s]*?)(?:\s+on\s+whatsapp)?$/);
-      const m2 = text.match(/whatsapp\s+([a-z][a-z\s]*?)\s+(?:saying\s+|message\s+)?(.+)/);
+      const m2 = text.match(/^whatsapp\s+(.+)$/);
       if (m1) { message = m1[1].trim(); contactName = m1[2].trim(); }
-      else if (m2) { contactName = m2[1].trim(); message = m2[2].trim(); }
+      else if (m2) {
+        const rest = m2[1].replace(/^(?:saying|message)\s+/, "").trim();
+        const saved = contacts.list().find((c) => rest.startsWith(c.name.toLowerCase() + " "));
+        if (saved) {
+          contactName = saved.name;
+          message = rest.slice(saved.name.length).trim();
+        } else {
+          const parts = rest.split(/\s+/);
+          contactName = parts.shift() || "";
+          message = parts.join(" ").trim();
+        }
+      }
 
       if (contactName) {
         const c = contacts.find(contactName);
