@@ -1,94 +1,77 @@
-// SanketX 2047 — Desktop bridge (browser → local Python agent over WebSocket)
+// SanketX 2047 — Desktop bridge (browser → local Python agent over HTTP)
+// Endpoint contract:
+//   POST http://localhost:5000/command   { "command": "<text or action>", ...params }
+//   GET  http://localhost:5000/ping      -> { ok: true }
 import { brain } from "./store";
 
-type Pending = { resolve: (v: any) => void; reject: (e: any) => void };
+const BASE = "http://localhost:5000";
 
 class DesktopBridge {
-  private ws: WebSocket | null = null;
-  private pending = new Map<string, Pending>();
-  private retryTimer: number | null = null;
-  private url = "ws://localhost:8765";
   public connected = false;
-  public actions: string[] = [];
+  private pollTimer: number | null = null;
 
   connect() {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
-    try {
-      this.ws = new WebSocket(this.url);
-    } catch {
-      this.scheduleRetry();
-      return;
+    this.ping();
+    if (this.pollTimer == null) {
+      this.pollTimer = window.setInterval(() => this.ping(), 4000);
     }
-    this.ws.onopen = () => {
-      this.connected = true;
-      brain.set({ desktopLink: true });
-      brain.log("system", "// DESKTOP.LINK :: ONLINE — agent reachable on " + this.url);
-    };
-    this.ws.onclose = () => {
-      this.connected = false;
-      brain.set({ desktopLink: false });
-      this.scheduleRetry();
-    };
-    this.ws.onerror = () => {
-      this.connected = false;
-      brain.set({ desktopLink: false });
-    };
-    this.ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === "hello") {
-          this.actions = msg.actions || [];
-          brain.log("system", `// AGENT v${msg.version} :: ${this.actions.length} capabilities`);
-          return;
-        }
-        if (msg.type === "result" && msg.id && this.pending.has(msg.id)) {
-          const p = this.pending.get(msg.id)!;
-          this.pending.delete(msg.id);
-          msg.ok ? p.resolve(msg.result) : p.reject(new Error(msg.error));
-        }
-      } catch (e) {
-        // ignore
+  }
+
+  async ping() {
+    try {
+      const r = await fetch(`${BASE}/ping`, { method: "GET" });
+      const ok = r.ok;
+      if (ok && !this.connected) {
+        brain.log("system", "// DESKTOP.LINK :: ONLINE — agent reachable on " + BASE);
       }
-    };
-  }
-
-  private scheduleRetry() {
-    if (this.retryTimer) return;
-    this.retryTimer = window.setTimeout(() => {
-      this.retryTimer = null;
-      this.connect();
-    }, 4000);
-  }
-
-  isOnline() {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
-
-  send(action: string, params: Record<string, any> = {}): Promise<any> {
-    if (!this.isOnline()) {
-      return Promise.reject(new Error("Desktop agent offline. Run agent.py on your laptop."));
-    }
-    const id = Math.random().toString(36).slice(2);
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws!.send(JSON.stringify({ id, action, params }));
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
-          reject(new Error("agent timeout"));
-        }
-      }, 30000);
-    });
-  }
-
-  fire(action: string, params: Record<string, any> = {}) {
-    if (!this.isOnline()) return false;
-    try {
-      this.ws!.send(JSON.stringify({ action, params }));
-      return true;
+      this.connected = ok;
+      brain.set({ desktopLink: ok });
     } catch {
-      return false;
+      if (this.connected) brain.log("error", "// DESKTOP.LINK :: OFFLINE");
+      this.connected = false;
+      brain.set({ desktopLink: false });
     }
+  }
+
+  isOnline() { return this.connected; }
+
+  /** Natural-language command — Python agent parses & dispatches */
+  async sendCommand(command: string): Promise<any> {
+    const r = await fetch(`${BASE}/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command }),
+    });
+    if (!r.ok) throw new Error(`agent ${r.status}`);
+    return r.json();
+  }
+
+  /** Structured action — sent as { command: "<action>", ...params } */
+  async send(action: string, params: Record<string, any> = {}): Promise<any> {
+    const r = await fetch(`${BASE}/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: action, ...params }),
+    });
+    if (!r.ok) throw new Error(`agent ${r.status}`);
+    const j = await r.json();
+    if (j.ok === false) throw new Error(j.error || "agent error");
+    return j.result ?? j;
+  }
+
+  /** Fire-and-forget for high-frequency calls (cursor moves) */
+  fire(action: string, params: Record<string, any> = {}) {
+    if (!this.connected) return false;
+    try {
+      // keepalive lets us spam without blocking — ignore response
+      fetch(`${BASE}/command`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: action, ...params }),
+        keepalive: true,
+      }).catch(() => {});
+      return true;
+    } catch { return false; }
   }
 }
 
