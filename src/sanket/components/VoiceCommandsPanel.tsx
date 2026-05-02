@@ -49,6 +49,19 @@ const GROUPS: Group[] = [
     ],
   },
   {
+    title: "SHOW NUMBERS / GRID  (precise voice clicking)",
+    items: [
+      { say: "Show numbers", does: "Numbers every clickable element on screen" },
+      { say: "Click 5 / Click five", does: "Clicks the element labeled 5" },
+      { say: "Double click 3", does: "Double clicks element 3" },
+      { say: "Right click 2", does: "Right clicks element 2" },
+      { say: "Hide numbers", does: "Removes the number overlay" },
+      { say: "Show grid", does: "Splits screen into a 3×3 grid" },
+      { say: "Click 5 (with grid)", does: "Clicks center of grid cell 5" },
+      { say: "Hide grid", does: "Removes the grid overlay" },
+    ],
+  },
+  {
     title: "MOUSE & CLICKING  (Mac Voice Control style)",
     items: [
       { say: "Click", does: "Single left click at cursor position" },
