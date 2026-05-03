@@ -351,32 +351,32 @@ async function dispatchIntent(intent: any): Promise<boolean> {
       return true;
     }
     case "key_hold":
-      return !!(await desktopAction("press", { key: normKey(intent.key) }, `Holding ${intent.key}.`));
+      await desktopAction("press", { key: normKey(intent.key) }, `Holding ${intent.key}.`); return true;
     case "key_release":
-      return !!(await desktopAction("press", { key: normKey(intent.key) }, `Releasing ${intent.key}.`));
+      await desktopAction("press", { key: normKey(intent.key) }, `Releasing ${intent.key}.`); return true;
     case "type":
-      return !!(await desktopAction("type", { text: String(intent.text || "") }, "Typing."));
+      await desktopAction("type", { text: String(intent.text || "") }, "Typing."); return true;
     case "mouse_click": {
       const t = intent.type || "left";
       const params = t === "double" ? { button: "left", clicks: 2 } :
                      t === "right"  ? { button: "right" } :
                                        { button: "left" };
-      return !!(await desktopAction("click", params, `${t} click.`));
+      await desktopAction("click", params, `${t} click.`); return true;
     }
     case "scroll": {
       const amt = SCROLL_AMOUNT[intent.amount] ?? 400;
       const signed = intent.direction === "down" ? -amt : amt;
-      return !!(await desktopAction("scroll", { amount: signed }, `Scrolling ${intent.direction}.`));
+      await desktopAction("scroll", { amount: signed }, `Scrolling ${intent.direction}.`); return true;
     }
     case "open_app":
-      return !!(await desktopAction("open_app", { name: String(intent.app || "").toLowerCase() }, `Opening ${intent.app}.`));
+      await desktopAction("open_app", { name: String(intent.app || "").toLowerCase() }, `Opening ${intent.app}.`); return true;
     case "system": {
       const t = String(intent.type || "");
       if (t.startsWith("volume_") || t === "mute") {
         const dir = t === "mute" ? "mute" : t.split("_")[1];
-        return !!(await desktopAction("volume", { direction: dir, times: 5 }, `Volume ${dir}.`));
+        await desktopAction("volume", { direction: dir, times: 5 }, `Volume ${dir}.`); return true;
       }
-      return !!(await desktopAction("system", { what: t }, `System ${t}.`));
+      await desktopAction("system", { what: t }, `System ${t}.`); return true;
     }
     case "grid_click": {
       const n = parseInt(intent.cell);
