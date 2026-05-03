@@ -109,15 +109,16 @@ export function speak(text: string) {
   u.pitch = 0.9;
   u.volume = 1;
   speechState.speaking = true;
-  speechState.ignoreUntil = Date.now() + Math.max(1800, text.length * 75);
+  speechState.ignoreUntil = Date.now() + Math.max(2200, text.length * 90);
+  rememberSpoken(text);
   u.onend = () => {
     speechState.speaking = false;
-    speechState.ignoreUntil = Date.now() + 900;
+    speechState.ignoreUntil = Date.now() + 1400;
     window.dispatchEvent(new Event("jarvis:speech-end"));
   };
   u.onerror = () => {
     speechState.speaking = false;
-    speechState.ignoreUntil = Date.now() + 900;
+    speechState.ignoreUntil = Date.now() + 1400;
     window.dispatchEvent(new Event("jarvis:speech-end"));
   };
   window.speechSynthesis.cancel();
