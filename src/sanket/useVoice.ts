@@ -11,10 +11,14 @@ export function useVoice() {
     const rec = createRecognition({
       onResult: (text, isFinal) => {
         if (isJarvisSpeaking()) return;
-        if (isFinal && text && text !== lastFinal.current) {
-          lastFinal.current = text;
-          handleCommand(text);
+        if (!isFinal || !text) return;
+        if (isEchoOfJarvis(text)) {
+          brain.log("system", `// ECHO.FILTER dropped: "${text}"`);
+          return;
         }
+        if (text === lastFinal.current) return;
+        lastFinal.current = text;
+        handleCommand(text);
       },
       onEnd: () => {
         // auto-restart while listening flag is on
