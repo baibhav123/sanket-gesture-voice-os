@@ -405,6 +405,7 @@ function normKey(k: any): string {
   const s = String(k || "").toLowerCase().trim();
   const map: Record<string, string> = { control: "ctrl", option: "alt", return: "enter", escape: "esc" };
   return map[s] || s;
+}
 
 async function writeCodeFlow(prompt: string, copyOnly: boolean) {
   brain.set({ thinking: true });
