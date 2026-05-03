@@ -318,8 +318,93 @@ export async function handleCommand(raw: string) {
     return respond("Searching for " + searchMatch[1]);
   }
 
+  // ===== AI INTENT FALLBACK — structured action JSON =====
+  if (await tryIntentFallback(raw)) return;
+
   await askAI(raw);
 }
+
+const SCROLL_AMOUNT: Record<string, number> = { small: 200, medium: 400, large: 800 };
+
+async function tryIntentFallback(raw: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke("voice-intent", { body: { command: raw } });
+    if (error) return false;
+    const intent = (data as any)?.intent;
+    if (!intent || !intent.action || intent.action === "none") return false;
+    return await dispatchIntent(intent);
+  } catch { return false; }
+}
+
+async function dispatchIntent(intent: any): Promise<boolean> {
+  const a = intent.action;
+  const repeat = Math.max(1, Math.min(50, parseInt(intent.repeat) || 1));
+
+  switch (a) {
+    case "key_press": {
+      const keys = Array.isArray(intent.keys) ? intent.keys.map(normKey) : [];
+      if (!keys.length) return false;
+      for (let i = 0; i < repeat; i++) {
+        await desktopAction("press", { key: keys.length === 1 ? keys[0] : keys },
+          i === 0 ? `Pressing ${keys.join("+")}${repeat > 1 ? ` ×${repeat}` : ""}.` : "");
+      }
+      return true;
+    }
+    case "key_hold":
+      return !!(await desktopAction("press", { key: normKey(intent.key) }, `Holding ${intent.key}.`));
+    case "key_release":
+      return !!(await desktopAction("press", { key: normKey(intent.key) }, `Releasing ${intent.key}.`));
+    case "type":
+      return !!(await desktopAction("type", { text: String(intent.text || "") }, "Typing."));
+    case "mouse_click": {
+      const t = intent.type || "left";
+      const params = t === "double" ? { button: "left", clicks: 2 } :
+                     t === "right"  ? { button: "right" } :
+                                       { button: "left" };
+      return !!(await desktopAction("click", params, `${t} click.`));
+    }
+    case "scroll": {
+      const amt = SCROLL_AMOUNT[intent.amount] ?? 400;
+      const signed = intent.direction === "down" ? -amt : amt;
+      return !!(await desktopAction("scroll", { amount: signed }, `Scrolling ${intent.direction}.`));
+    }
+    case "open_app":
+      return !!(await desktopAction("open_app", { name: String(intent.app || "").toLowerCase() }, `Opening ${intent.app}.`));
+    case "system": {
+      const t = String(intent.type || "");
+      if (t.startsWith("volume_") || t === "mute") {
+        const dir = t === "mute" ? "mute" : t.split("_")[1];
+        return !!(await desktopAction("volume", { direction: dir, times: 5 }, `Volume ${dir}.`));
+      }
+      return !!(await desktopAction("system", { what: t }, `System ${t}.`));
+    }
+    case "grid_click": {
+      const n = parseInt(intent.cell);
+      if (!n) return false;
+      if (!numberOverlay.isGridOn() && !numberOverlay.isNumbersOn()) numberOverlay.showGrid();
+      const ok = numberOverlay.isGridOn() ? numberOverlay.activateGridCell(n) : numberOverlay.activate(n);
+      respond(ok ? `Clicking ${n}.` : `No item ${n}.`);
+      return true;
+    }
+    case "mode": {
+      const on = intent.state === "on";
+      if (intent.target === "mouse") {
+        brain.set({ mouseEnabled: on });
+        if (desktop.isOnline()) desktop.fire(on ? "mouse_on" : "mouse_off", {});
+        respond(`Mouse ${on ? "enabled" : "disabled"}.`);
+        return true;
+      }
+      respond(`${intent.target} ${on ? "on" : "off"}.`);
+      return true;
+    }
+  }
+  return false;
+}
+
+function normKey(k: any): string {
+  const s = String(k || "").toLowerCase().trim();
+  const map: Record<string, string> = { control: "ctrl", option: "alt", return: "enter", escape: "esc" };
+  return map[s] || s;
 
 async function writeCodeFlow(prompt: string, copyOnly: boolean) {
   brain.set({ thinking: true });
