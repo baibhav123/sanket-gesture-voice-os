@@ -182,12 +182,6 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
                   visible: true, pinching, frozen: palmOpen } as any,
         fingers,
       });
-      return;
-
-      brain.set({
-        cursor: { x, y, visible: true, pinching },
-        fingers,
-      });
     }
 
     function syntheticClick(x: number, y: number) {
