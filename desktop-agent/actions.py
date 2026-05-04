@@ -405,11 +405,36 @@ def screenshot(params):
 
 
 def volume(params):
+    """System-level volume control. On macOS uses AppleScript (real system volume),
+    elsewhere falls back to media keys via pyautogui."""
+    direction = (params.get("direction") or "up").lower()
+    step = int(params.get("step", 10))
+    times = int(params.get("times", 1))
+    delta = step * max(1, times)
+
+    if IS_MAC:
+        if direction == "mute":
+            subprocess.run(["osascript", "-e", "set volume with output muted"])
+            return "volume muted (system)"
+        if direction == "unmute":
+            subprocess.run(["osascript", "-e", "set volume without output muted"])
+            return "volume unmuted (system)"
+        op = "+" if direction == "up" else "-"
+        script = (
+            f"set cur to output volume of (get volume settings)\n"
+            f"set newv to cur {op} {delta}\n"
+            f"if newv > 100 then set newv to 100\n"
+            f"if newv < 0 then set newv to 0\n"
+            f"set volume output volume newv"
+        )
+        r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip() or "osascript failed")
+        return f"volume {direction} by {delta} (system)"
+
     _need_pyauto()
-    direction = params.get("direction", "up")
-    times = int(params.get("times", 5))
     key = "volumeup" if direction == "up" else "volumedown" if direction == "down" else "volumemute"
-    for _ in range(times):
+    for _ in range(max(1, times)):
         pyautogui.press(key)
     return f"volume {direction} x{times}"
 
