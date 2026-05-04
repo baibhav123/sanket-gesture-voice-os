@@ -684,6 +684,14 @@ ACTION_REGISTRY = {
     "open_file": open_file,
     "mouse_on": mouse_on,
     "mouse_off": mouse_off,
+    "open_settings": open_settings,
+    "open_wifi": open_wifi,
+    "open_bluetooth": open_bluetooth,
+    "open_airdrop": open_airdrop,
+    "open_battery": open_battery,
+    "find_and_open": find_and_open,
+    "whatsapp_open_chat": whatsapp_open_chat,
+    "whatsapp_send_file": whatsapp_send_file,
 }
 
 
