@@ -153,6 +153,9 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         pinchHoldRef.current.down = false;
       }
 
+      // Open palm (5 fingers extended) → freeze cursor movement, but keep click detection.
+      const palmOpen = fingers >= 5;
+
       // Forward to real desktop mouse — fast fire-and-forget, so cursor movement never waits for agent replies.
       if (desktop.isOnline()) {
         const now = performance.now();
@@ -160,7 +163,7 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
         const ny = idx.y;
         const last = lastDesktopRef.current;
         const moved = !last || Math.hypot(nx - last.nx, ny - last.ny) > 0.004;
-        if (moved && now - lastSendRef.current > 16) {
+        if (!palmOpen && moved && now - lastSendRef.current > 16) {
           lastSendRef.current = now;
           lastDesktopRef.current = { nx, ny };
           desktop.fire("move_norm", { nx, ny, duration: 0 });
@@ -172,6 +175,14 @@ export function useGesture(videoRef: React.RefObject<HTMLVideoElement>) {
           pinchHoldRef.current.desktopFired = false;
         }
       }
+
+      brain.set({
+        cursor: { x: palmOpen && smoothRef.current ? smoothRef.current.x : x,
+                  y: palmOpen && smoothRef.current ? smoothRef.current.y : y,
+                  visible: true, pinching, frozen: palmOpen } as any,
+        fingers,
+      });
+      return;
 
       brain.set({
         cursor: { x, y, visible: true, pinching },
