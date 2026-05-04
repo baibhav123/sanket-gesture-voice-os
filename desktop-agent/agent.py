@@ -134,15 +134,41 @@ def command_route():
     # JSON body as its params. Otherwise, parse the free-form sentence.
     if raw in ACTION_REGISTRY:
         action, params = raw, {k: v for k, v in data.items() if k != "command"}
-    else:
-        parsed = parse_command(raw)
-        if not parsed:
-            return jsonify({"ok": False, "error": f"unknown command: {raw}"}), 400
-        action, params = parsed
-        # Merge any extra params from the body (e.g. command="whatsapp", phone=..., message=...)
-        for k, v in data.items():
-            if k != "command" and k not in params:
-                params[k] = v
+        return _run_single(action, params)
+
+    # Compound command splitting: "open instagram and open facebook", "x then y"
+    parts = re.split(r"\s+(?:and then|then|and|,)\s+", raw.lower())
+    parts = [p.strip() for p in parts if p.strip()]
+    if len(parts) > 1:
+        results = []
+        for p in parts:
+            parsed = parse_command(p)
+            if not parsed:
+                results.append({"part": p, "ok": False, "error": "unknown"})
+                continue
+            a, pr = parsed
+            log("CMD", f"(multi) {a}  {pr}")
+            try:
+                r = execute_action(a, pr)
+                log("OK", f"{a} -> {r}")
+                results.append({"part": p, "ok": True, "action": a, "result": r})
+            except Exception as e:
+                err = f"{type(e).__name__}: {e}"
+                log("ERR", err)
+                results.append({"part": p, "ok": False, "action": a, "error": err})
+        return jsonify({"ok": True, "multi": True, "results": results})
+
+    parsed = parse_command(raw)
+    if not parsed:
+        return jsonify({"ok": False, "error": f"unknown command: {raw}"}), 400
+    action, params = parsed
+    for k, v in data.items():
+        if k != "command" and k not in params:
+            params[k] = v
+    return _run_single(action, params)
+
+
+def _run_single(action, params):
 
     noisy = action in {"move_norm", "move_rel", "move", "click"}
     if not noisy:
