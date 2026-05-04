@@ -63,6 +63,36 @@ def parse_command(text: str):
     if "scroll down" in t:
         return ("scroll", {"amount": -400})
 
+    # System panels (macOS-friendly natural phrases)
+    if re.search(r"\b(open|show|turn on|toggle)\s+(the\s+)?wi[\- ]?fi\b", t) or "wifi settings" in t:
+        return ("open_wifi", {})
+    if re.search(r"\b(open|show|turn on|toggle)\s+(the\s+)?bluetooth\b", t):
+        return ("open_bluetooth", {})
+    if "airdrop" in t:
+        return ("open_airdrop", {})
+    if "battery" in t and ("open" in t or "show" in t or "settings" in t):
+        return ("open_battery", {})
+    if re.search(r"\bopen\s+(system\s+)?settings\b", t) or "preferences" in t:
+        return ("open_settings", {})
+
+    # WhatsApp: open chat by name (no message)
+    m = re.search(r"open\s+(?:whatsapp\s+)?chat\s+(?:with\s+|of\s+)?(.+)$", t)
+    if m:
+        return ("whatsapp_open_chat", {"name": m.group(1).strip()})
+
+    # WhatsApp: send file
+    m = re.search(r"send\s+file\s+(.+?)\s+(?:to|on whatsapp to)\s+(.+)$", t)
+    if m:
+        return ("whatsapp_send_file", {"path": m.group(1).strip(), "name": m.group(2).strip()})
+
+    # Open file/folder by name (Spotlight)
+    m = re.search(r"open\s+(?:file|folder)\s+(.+)$", t)
+    if m:
+        return ("find_and_open", {"name": m.group(1).strip()})
+    m = re.search(r"find\s+(?:file\s+)?(.+)$", t)
+    if m and len(m.group(1).split()) <= 4:
+        return ("find_and_open", {"name": m.group(1).strip()})
+
     # System actions
     m = re.search(r"(lock|sleep|shutdown|shut down|restart)\s+(?:the\s+)?(?:system|laptop|computer|pc)?", t)
     if m:

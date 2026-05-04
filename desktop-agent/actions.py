@@ -500,6 +500,150 @@ def ping(_params):
     return {"pong": True, "time": time.time(), "platform": platform.system()}
 
 
+# ---------- macOS system panels ----------
+
+def open_settings(_params):
+    if IS_MAC:
+        subprocess.Popen(["open", "-a", "System Settings"])
+    elif IS_WINDOWS:
+        subprocess.Popen("start ms-settings:", shell=True)
+    else:
+        subprocess.Popen(["xdg-open", "settings://"])
+    return "opened settings"
+
+
+def open_wifi(_params):
+    if IS_MAC:
+        # Newer macOS uses System Settings panes
+        subprocess.Popen(["open", "x-apple.systempreferences:com.apple.Network-Settings.extension"])
+    elif IS_WINDOWS:
+        subprocess.Popen("start ms-settings:network-wifi", shell=True)
+    else:
+        subprocess.Popen(["xdg-open", "settings://wifi"])
+    return "opened wifi"
+
+
+def open_bluetooth(_params):
+    if IS_MAC:
+        subprocess.Popen(["open", "x-apple.systempreferences:com.apple.BluetoothSettings"])
+    elif IS_WINDOWS:
+        subprocess.Popen("start ms-settings:bluetooth", shell=True)
+    else:
+        subprocess.Popen(["xdg-open", "settings://bluetooth"])
+    return "opened bluetooth"
+
+
+def open_airdrop(_params):
+    if IS_MAC:
+        subprocess.Popen(["osascript", "-e",
+            'tell application "Finder" to activate',
+            "-e", 'tell application "System Events" to keystroke "R" using {command down, shift down}'])
+    return "opened airdrop"
+
+
+def open_battery(_params):
+    if IS_MAC:
+        subprocess.Popen(["open", "x-apple.systempreferences:com.apple.preference.battery"])
+    elif IS_WINDOWS:
+        subprocess.Popen("start ms-settings:batterysaver", shell=True)
+    return "opened battery"
+
+
+# ---------- File search ----------
+
+def find_and_open(params):
+    """Spotlight-based file/folder search and open. params: {name: 'project.pdf'}"""
+    name = (params.get("name") or params.get("query") or "").strip()
+    if not name:
+        raise ValueError("name required")
+    if IS_MAC:
+        try:
+            r = subprocess.run(["mdfind", "-name", name], capture_output=True, text=True, timeout=8)
+            paths = [p for p in r.stdout.splitlines() if p.strip()]
+            if paths:
+                # Prefer something inside ~/ (user files) over system results
+                home = os.path.expanduser("~")
+                preferred = [p for p in paths if p.startswith(home)] or paths
+                subprocess.Popen(["open", preferred[0]])
+                return f"opened {preferred[0]}"
+        except Exception:
+            pass
+    # Generic fallback: walk ~/
+    for root, dirs, files in os.walk(os.path.expanduser("~")):
+        # skip heavy hidden dirs
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "Library")]
+        for f in files + dirs:
+            if name.lower() in f.lower():
+                full = os.path.join(root, f)
+                if IS_WINDOWS:
+                    os.startfile(full)
+                elif IS_MAC:
+                    subprocess.Popen(["open", full])
+                else:
+                    subprocess.Popen(["xdg-open", full])
+                return f"opened {full}"
+    raise RuntimeError(f"not found: {name}")
+
+
+# ---------- WhatsApp UI helpers ----------
+
+def whatsapp_open_chat(params):
+    """Open WhatsApp Desktop and search/open a chat by name (no message)."""
+    name = (params.get("name") or "").strip()
+    if not name:
+        raise ValueError("name required")
+    if not _open_whatsapp_native():
+        raise RuntimeError("WhatsApp Desktop not found")
+    _need_pyauto()
+    time.sleep(float(params.get("open_wait", 2.5)))
+    if IS_MAC:
+        pyautogui.hotkey("command", "n")
+    else:
+        pyautogui.hotkey("ctrl", "n")
+    time.sleep(0.4)
+    if HAS_CLIP:
+        pyperclip.copy(name)
+        pyautogui.hotkey("command" if IS_MAC else "ctrl", "v")
+    else:
+        pyautogui.typewrite(name, interval=0.02)
+    time.sleep(1.0)
+    pyautogui.press("enter")
+    return f"opened chat {name}"
+
+
+def whatsapp_send_file(params):
+    """Send a file in the currently-open WhatsApp chat.
+    params: {path: '/abs/path/file.pdf', name?: 'contact'}"""
+    _need_pyauto()
+    path = os.path.expanduser(params.get("path", ""))
+    if not path or not os.path.exists(path):
+        raise ValueError(f"file not found: {path}")
+    if params.get("name"):
+        whatsapp_open_chat({"name": params["name"]})
+        time.sleep(1.5)
+    # Open file picker (macOS WhatsApp: Cmd+Shift+O for attach is not standard;
+    # we use the universal "Open" shortcut on the focused app)
+    if IS_MAC:
+        pyautogui.hotkey("command", "shift", "o")
+    else:
+        pyautogui.hotkey("ctrl", "shift", "o")
+    time.sleep(1.0)
+    # Type path into the file dialog
+    if IS_MAC:
+        pyautogui.hotkey("command", "shift", "g")  # "Go to folder"
+        time.sleep(0.4)
+    if HAS_CLIP:
+        pyperclip.copy(path)
+        pyautogui.hotkey("command" if IS_MAC else "ctrl", "v")
+    else:
+        pyautogui.typewrite(path, interval=0.01)
+    time.sleep(0.4)
+    pyautogui.press("enter")
+    time.sleep(1.2)
+    pyautogui.press("enter")  # confirm send
+    return f"sent file {path}"
+
+
 # ---------- Mouse-control toggles (status flags consumed by the web HUD) ----------
 _MOUSE_STATE = {"enabled": True}
 
@@ -540,6 +684,14 @@ ACTION_REGISTRY = {
     "open_file": open_file,
     "mouse_on": mouse_on,
     "mouse_off": mouse_off,
+    "open_settings": open_settings,
+    "open_wifi": open_wifi,
+    "open_bluetooth": open_bluetooth,
+    "open_airdrop": open_airdrop,
+    "open_battery": open_battery,
+    "find_and_open": find_and_open,
+    "whatsapp_open_chat": whatsapp_open_chat,
+    "whatsapp_send_file": whatsapp_send_file,
 }
 
 
