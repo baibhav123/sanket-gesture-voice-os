@@ -6,6 +6,7 @@ import { handleCommand } from "./commands";
 export function useVoice() {
   const recRef = useRef<ReturnType<typeof createRecognition> | null>(null);
   const lastFinal = useRef<string>("");
+  const lastFinalAt = useRef<number>(0);
 
   useEffect(() => {
     const rec = createRecognition({
