@@ -292,6 +292,24 @@ export async function handleCommand(raw: string) {
     return respond("The time is " + new Date().toLocaleTimeString());
   }
 
+  // ===== SYSTEM PANELS (Wi-Fi / Bluetooth / AirDrop / Battery / Settings) =====
+  // Must come BEFORE the generic "open <app>" matcher.
+  if (/\b(wi[\s-]?fi|wifi)\b/.test(text) && /\b(open|show|turn on|toggle|settings)\b/.test(text)) {
+    return desktopAction("open_wifi", {}, "Opening Wi-Fi settings.");
+  }
+  if (/\bbluetooth\b/.test(text) && /\b(open|show|turn on|toggle|settings)\b/.test(text)) {
+    return desktopAction("open_bluetooth", {}, "Opening Bluetooth.");
+  }
+  if (/\bairdrop\b/.test(text)) {
+    return desktopAction("open_airdrop", {}, "Opening AirDrop.");
+  }
+  if (/\bbattery\b/.test(text) && /\b(open|show|settings)\b/.test(text)) {
+    return desktopAction("open_battery", {}, "Opening Battery settings.");
+  }
+  if (/\bopen\s+(system\s+)?(settings|preferences)\b/.test(text)) {
+    return desktopAction("open_settings", {}, "Opening System Settings.");
+  }
+
   // OPEN APPS — smart: native first, website fallback (handled by agent)
   const openMatch = text.match(/(?:open|launch|start|run)\s+([a-z][a-z0-9 ]*)/);
   if (openMatch) {
