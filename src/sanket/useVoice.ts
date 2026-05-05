@@ -16,13 +16,17 @@ export function useVoice() {
           brain.log("system", `// ECHO.FILTER dropped: "${text}"`);
           return;
         }
-        if (text === lastFinal.current) return;
-        lastFinal.current = text;
+        // Debounce duplicates within 1.5s (interim + final can both fire)
+        const now = Date.now();
+        const norm = text.toLowerCase().trim();
+        if (norm === lastFinal.current && now - (lastFinalAt.current || 0) < 1500) return;
+        lastFinal.current = norm;
+        lastFinalAt.current = now;
         handleCommand(text);
       },
       onEnd: () => {
-        // auto-restart while listening flag is on
-        if (brain.get().listening && !isJarvisSpeaking()) setTimeout(() => rec.start(), 400);
+        // auto-restart aggressively while listening flag is on
+        if (brain.get().listening && !isJarvisSpeaking()) setTimeout(() => rec.start(), 150);
       },
       onError: (err) => {
         if (err === "not-allowed") {
