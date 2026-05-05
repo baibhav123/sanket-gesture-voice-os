@@ -64,12 +64,24 @@ export function createRecognition(opts: {
   const rec = new SR();
   rec.continuous = true;
   rec.interimResults = true;
+  rec.maxAlternatives = 3;
   rec.lang = "en-US";
 
   rec.onresult = (e: any) => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
-      opts.onResult(r[0].transcript.trim(), r.isFinal);
+      // Pick best alternative across all candidates
+      let best = r[0];
+      for (let k = 1; k < r.length; k++) {
+        if ((r[k].confidence || 0) > (best.confidence || 0)) best = r[k];
+      }
+      const conf = best.confidence ?? 0;
+      const txt = (best.transcript || "").trim();
+      if (!txt) continue;
+      // For whispers: accept high-confidence interim results too (>=0.55)
+      // This catches quiet speech that the engine is sure about before finalising.
+      const acceptInterim = !r.isFinal && conf >= 0.55 && txt.split(/\s+/).length >= 1;
+      opts.onResult(txt, r.isFinal || acceptInterim);
     }
   };
   rec.onerror = (e: any) => opts.onError?.(e.error || "err");
